@@ -1,16 +1,16 @@
+import { Point } from "@/libs/render/shapes"
+
 export abstract class Entity {
     private static counter: number = 0
 
     protected readonly id: number
     protected name: string
-    protected x: number
-    protected y: number
+    protected position: Point
 
     constructor(name: string, x: number = 0, y: number = 0) {
         this.name = name
         this.id = Entity.counter
-        this.x = x
-        this.y = y
+        this.position = new Point(x, y)
 
         Entity.counter++
     }
@@ -23,10 +23,18 @@ export abstract class Entity {
         this.name = name
     }
 
-    SetPosition(this: Entity, x: number, y: number){
-        this.x = x
-        this.y = y
+    GetPosition(this: Entity) {
+        return this.position
     }
+
+    SetPosition(this: Entity, x: number, y: number){
+        this.position.x = x
+        this.position.y = y
+    }
+
+    abstract GetWidth(this: Entity): number
+
+    abstract GetHeight(this: Entity): number
 
     abstract Render(this: Entity, ctx: CanvasRenderingContext2D): void
 }

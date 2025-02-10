@@ -5,13 +5,18 @@ import { MouseEvent, RefObject, useEffect, useRef } from "react"
 import styles from "./Canvas.module.scss"
 import { Entity } from "@/libs/erd/entity"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
+import { PointWithRectCollides } from "@/libs/render/collisions"
+import { Point, Rectangle } from "@/libs/render/shapes"
+import useMousePosition from "@/app/hooks/use_mouse_position"
 
 
 export default function Canvas() {
+    const mousePositionRef = useMousePosition()
     const canvasRef: RefObject<HTMLCanvasElement> | RefObject<null> = useRef(null)
     const canvasCtxRef: RefObject<CanvasRenderingContext2D> | RefObject<null> = useRef(null)
     const entities = new Array<Entity>()
 
+    let draggedEntityIndex = -1
     let lastFrameID = 0
 
     const getCanvas = () => {
@@ -63,26 +68,61 @@ export default function Canvas() {
             cancelAnimationFrame(lastFrameID)
         }
     }, [])
-    
-    const addRectOnClick = (e: MouseEvent<HTMLCanvasElement>) => {
+
+    const renderEntities = () => {
+        const canvasCtx = getCanvasCtx()
+        canvasCtx.clearRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height)
+
+        for (let i = 0; i < entities.length; ++i) {
+            entities[i].Render(canvasCtx)
+        }
+    }
+
+    const updateEntityPositionOnDrag = () => {
+        if (draggedEntityIndex === -1) {
+            return
+        }
+
+        entities[draggedEntityIndex].SetPosition(mousePositionRef.current.x, mousePositionRef.current.y)
+        renderEntities()
+
+        lastFrameID = requestAnimationFrame(updateEntityPositionOnDrag)
+    }
+
+    const addEntityOnClick = (e: MouseEvent<HTMLCanvasElement>) => {
         entities.push(new CrowsFootNotation.Entity("random", e.clientX, e.clientY))
+        lastFrameID = requestAnimationFrame(renderEntities)
+    }
 
-        lastFrameID = requestAnimationFrame(() => {
-            const canvasCtx = getCanvasCtx()
+    const dragEntityOnMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
+        draggedEntityIndex = entities.findIndex((entity: Entity) =>
+            PointWithRectCollides(
+                new Point(e.clientX, e.clientY),
+                new Rectangle(entity.GetPosition(), entity.GetWidth(), entity.GetHeight()),
+            ),
+        )
 
-            canvasCtx.clearRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height)
+        if (draggedEntityIndex === -1) {
+            addEntityOnClick(e)
+            return
+        }
 
-            for (let i = 0; i < entities.length; ++i) {
-                entities[i].Render(canvasCtx)
-            }
-        })
+        lastFrameID = requestAnimationFrame(updateEntityPositionOnDrag)
+    }
+
+    const dropEntityOnMouseUp = (e: MouseEvent<HTMLCanvasElement>) => {
+        if (draggedEntityIndex === -1) {
+            return
+        }
+
+        draggedEntityIndex = -1
+        cancelAnimationFrame(lastFrameID)
     }
 
     return (
         <canvas
-            onClick={addRectOnClick}
-            onMouseDown={() => console.log("drag n...")}
-            onMouseUp={() => console.log("drop.")}
+            onMouseDown={dragEntityOnMouseDown}
+            onMouseUp={dropEntityOnMouseUp}
             className={styles.canvas}
             ref={canvasRef}
         >
