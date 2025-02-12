@@ -3,7 +3,7 @@
 import { MouseEvent, RefObject, useEffect, useRef } from "react"
 
 import styles from "./Canvas.module.scss"
-import { Entity } from "@/libs/erd/entity"
+import { BaseEntity } from "@/libs/erd/base_entity"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
 import { PointWithRectCollides } from "@/libs/render/collisions"
 import { Point, Rectangle } from "@/libs/render/shapes"
@@ -11,13 +11,20 @@ import useMousePosition from "@/app/hooks/use_mouse_position"
 
 
 export default function Canvas() {
+    // consts
+    const doubleClickDurationMS = 500
+
+    // refs
     const mousePositionRef = useMousePosition()
     const canvasRef: RefObject<HTMLCanvasElement> | RefObject<null> = useRef(null)
     const canvasCtxRef: RefObject<CanvasRenderingContext2D> | RefObject<null> = useRef(null)
-    const entities = new Array<Entity>()
 
+    // state variables
+    const entities = new Array<BaseEntity>()
+    let draggedEntityOffset: Point | null = null
     let draggedEntityIndex = -1
     let lastFrameID = 0
+    let lastMouseDownTimestamp = 0
 
     const getCanvas = () => {
         return canvasRef.current as unknown as HTMLCanvasElement
@@ -83,7 +90,15 @@ export default function Canvas() {
             return
         }
 
-        entities[draggedEntityIndex].SetPosition(mousePositionRef.current.x, mousePositionRef.current.y)
+        const mouseX = mousePositionRef.current.x
+        const mouseY = mousePositionRef.current.y
+
+        if (!draggedEntityOffset) {
+            const entityPos = entities[draggedEntityIndex].GetPosition()
+            draggedEntityOffset = new Point(mouseX - entityPos.x, mouseY - entityPos.y)
+        }
+
+        entities[draggedEntityIndex].SetPosition(mouseX - draggedEntityOffset.x, mouseY - draggedEntityOffset.y)
         renderEntities()
 
         lastFrameID = requestAnimationFrame(updateEntityPositionOnDrag)
@@ -95,10 +110,21 @@ export default function Canvas() {
     }
 
     const dragEntityOnMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
-        draggedEntityIndex = entities.findIndex((entity: Entity) =>
+        // double click occurred
+        if (e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS) {
+            cancelAnimationFrame(lastFrameID)
+            draggedEntityIndex = -1
+            lastMouseDownTimestamp = e.timeStamp
+            console.log("double click")
+            return
+        }
+
+        lastMouseDownTimestamp = e.timeStamp
+
+        draggedEntityIndex = entities.findIndex((entity: BaseEntity) =>
             PointWithRectCollides(
                 new Point(e.clientX, e.clientY),
-                new Rectangle(entity.GetPosition(), entity.GetWidth(), entity.GetHeight()),
+                new Rectangle(entity.GetCenteredPosition(), entity.GetWidth(), entity.GetHeight()),
             ),
         )
 
@@ -106,7 +132,7 @@ export default function Canvas() {
             addEntityOnClick(e)
             return
         }
-
+        
         lastFrameID = requestAnimationFrame(updateEntityPositionOnDrag)
     }
 
@@ -116,6 +142,7 @@ export default function Canvas() {
         }
 
         draggedEntityIndex = -1
+        draggedEntityOffset = null
         cancelAnimationFrame(lastFrameID)
     }
 

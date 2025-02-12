@@ -1,8 +1,8 @@
-import { Entity } from "@/libs/erd/entity"
+import { BaseEntity } from "@/libs/erd/base_entity"
 import { Point } from "@/libs/render/shapes"
 
 export class CrowsFootNotation {
-    static Entity = class extends Entity {
+    static Entity = class extends BaseEntity {
         private readonly minWidth = 100
         private readonly minAttributesHeight = 50
         private readonly headerHeight = 30
@@ -10,7 +10,7 @@ export class CrowsFootNotation {
         private curWidth = this.minWidth
         private curAttributesHeight = this.minAttributesHeight
 
-        override GetPosition(): Point {
+        GetCenteredPosition(): Point {
             return this.position.Translate(-this.curWidth / 2, -this.headerHeight / 2)
         }
 
@@ -23,7 +23,7 @@ export class CrowsFootNotation {
         }
 
         Render(ctx: CanvasRenderingContext2D) {
-            const centeredPos = this.position.Translate(-this.curWidth / 2, -this.headerHeight / 2)
+            const centeredPos = this.GetCenteredPosition()
 
             // TODO: write function to reset fill styles to default values
             ctx.fillStyle = "white"
