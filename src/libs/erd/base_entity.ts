@@ -32,6 +32,8 @@ export abstract class BaseEntity {
         this.position.y = y
     }
 
+    abstract GetHeaderHeight(this: BaseEntity): number
+
     abstract GetCenteredPosition(this: BaseEntity): Point
 
     abstract GetWidth(this: BaseEntity): number

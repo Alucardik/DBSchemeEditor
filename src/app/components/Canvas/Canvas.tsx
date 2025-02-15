@@ -12,7 +12,7 @@ import useMousePosition from "@/app/hooks/use_mouse_position"
 
 export default function Canvas() {
     // consts
-    const doubleClickDurationMS = 500
+    const doubleClickDurationMS = 400
 
     // refs
     const mousePositionRef = useMousePosition()
@@ -21,6 +21,7 @@ export default function Canvas() {
 
     // state variables
     const entities = new Array<BaseEntity>()
+    const currentNotation = CrowsFootNotation.GetNotationName()
     let draggedEntityOffset: Point | null = null
     let draggedEntityIndex = -1
     let lastFrameID = 0
@@ -85,6 +86,15 @@ export default function Canvas() {
         }
     }
 
+    const getInteractedEntity =  (e: MouseEvent<HTMLCanvasElement>) => {
+        return entities.findIndex((entity: BaseEntity) =>
+            PointWithRectCollides(
+                new Point(e.clientX, e.clientY),
+                new Rectangle(entity.GetCenteredPosition(), entity.GetWidth(), entity.GetHeight()),
+            ),
+        )
+    }
+
     const updateEntityPositionOnDrag = () => {
         if (draggedEntityIndex === -1) {
             return
@@ -109,30 +119,53 @@ export default function Canvas() {
         lastFrameID = requestAnimationFrame(renderEntities)
     }
 
-    const dragEntityOnMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
-        // double click occurred
-        if (e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS) {
-            cancelAnimationFrame(lastFrameID)
-            draggedEntityIndex = -1
-            lastMouseDownTimestamp = e.timeStamp
-            console.log("double click")
+    const handleEditOnDoubleClick = (e: MouseEvent<HTMLCanvasElement>) => {
+        cancelAnimationFrame(lastFrameID)
+        draggedEntityIndex = -1
+
+        console.log("double click")
+
+        const editedEntityIndex = getInteractedEntity(e)
+        if (editedEntityIndex === -1) {
+            addEntityOnClick(e)
             return
         }
 
+
+        // support multi-notation here
+        if (currentNotation !== CrowsFootNotation.GetNotationName()) {
+            return
+        }
+
+        const canvasCtx = getCanvasCtx()
+
+        const editHeader = PointWithRectCollides(
+            new Point(e.clientX, e.clientY),
+            new Rectangle(entities[editedEntityIndex].GetCenteredPosition(), entities[editedEntityIndex].GetWidth(), entities[editedEntityIndex].GetHeaderHeight()),
+        )
+        if (editHeader) {
+            lastFrameID = requestAnimationFrame(() => {
+                // TODO: maybe clear canvas as well to avoid multi-highlighting
+                (entities[editedEntityIndex] as CrowsFootNotation.Entity).HighlightHeader(canvasCtx)
+            })
+        }
+    }
+
+    const dragEntityOnMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
+        const isDoubleClick = e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS
         lastMouseDownTimestamp = e.timeStamp
 
-        draggedEntityIndex = entities.findIndex((entity: BaseEntity) =>
-            PointWithRectCollides(
-                new Point(e.clientX, e.clientY),
-                new Rectangle(entity.GetCenteredPosition(), entity.GetWidth(), entity.GetHeight()),
-            ),
-        )
+        if (isDoubleClick) {
+            handleEditOnDoubleClick(e)
+            return
+        }
 
+        draggedEntityIndex = getInteractedEntity(e)
         if (draggedEntityIndex === -1) {
             addEntityOnClick(e)
             return
         }
-        
+
         lastFrameID = requestAnimationFrame(updateEntityPositionOnDrag)
     }
 
