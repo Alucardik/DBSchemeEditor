@@ -7,6 +7,11 @@ export class Point {
         this.y = y
     }
 
+    Set(this: Point, x: number, y: number) {
+        this.x = x
+        this.y = y
+    }
+
     Translate(this: Point, xOffset: number, yOffset: number) {
         return new Point(this.x + xOffset, this.y + yOffset)
     }

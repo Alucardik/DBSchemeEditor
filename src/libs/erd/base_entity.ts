@@ -41,4 +41,6 @@ export abstract class BaseEntity {
     abstract GetHeight(this: BaseEntity): number
 
     abstract Render(this: BaseEntity, ctx: CanvasRenderingContext2D): void
+
+    abstract Clear(this: BaseEntity, ctx: CanvasRenderingContext2D): void
 }

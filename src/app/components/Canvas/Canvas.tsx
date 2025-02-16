@@ -8,7 +8,10 @@ import { CrowsFootNotation } from "@/libs/notations/crows_foot"
 import { PointWithRectCollides } from "@/libs/render/collisions"
 import { Point, Rectangle } from "@/libs/render/shapes"
 import useMousePosition from "@/app/hooks/use_mouse_position"
+import { Cursor } from "@/libs/render/cursor"
 
+
+const controlKeys = new Set(["Shift", "Control", "Alt", "Meta", "ArrowUp", "ArrowDown"])
 
 export default function Canvas() {
     // consts
@@ -20,9 +23,12 @@ export default function Canvas() {
     const canvasCtxRef: RefObject<CanvasRenderingContext2D> | RefObject<null> = useRef(null)
 
     // state variables
-    // save entities and current notation to local storage and upload from there on startup
+    // TODO: save entities and current notation to local storage and upload from there on startup
     const entities = new Array<BaseEntity>()
     let currentNotation = CrowsFootNotation.GetNotationName()
+
+    const cursor = new Cursor()
+    let cursorWholeTextSelected = false
 
     let inEditMode = false
 
@@ -83,6 +89,10 @@ export default function Canvas() {
         }
     }, [])
 
+    const animate = (animationCallback: () => void) => {
+        lastFrameID = requestAnimationFrame(animationCallback)
+    }
+
     const renderEntities = () => {
         const canvasCtx = getCanvasCtx()
         canvasCtx.clearRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height)
@@ -101,6 +111,35 @@ export default function Canvas() {
         )
     }
 
+    const renderCursor = () => {
+        if (editedEntityIndex === -1) {
+            return
+        }
+
+        // re-rendering whole entity with cursor for now
+        const canvasCtx = getCanvasCtx()
+
+        entities[editedEntityIndex].Clear(canvasCtx)
+        entities[editedEntityIndex].Render(canvasCtx)
+        cursor.Update(canvasCtx)
+    }
+
+    const updateCursor = () => {
+        // erase leftover cursor
+        if (!inEditMode) {
+            cursor.Reset()
+            animate(renderCursor)
+
+            return
+        }
+
+        if (cursor.IsUpdateNeeded()) {
+            renderCursor()
+        }
+
+        animate(updateCursor)
+    }
+
     const updateEntityPositionOnDrag = () => {
         if (draggedEntityIndex === -1) {
             return
@@ -117,7 +156,7 @@ export default function Canvas() {
         entities[draggedEntityIndex].SetPosition(mouseX - draggedEntityOffset.x, mouseY - draggedEntityOffset.y)
         renderEntities()
 
-        lastFrameID = requestAnimationFrame(updateEntityPositionOnDrag)
+        animate(updateEntityPositionOnDrag)
     }
 
     const updateEntityHeaderOnKeyPress = (e: KeyboardEvent<HTMLCanvasElement>) => {
@@ -125,23 +164,80 @@ export default function Canvas() {
             return
         }
 
-        // TODO: separate entities parts somehow (e.g. getEditedPart method on entity)
-        let newName = entities[editedEntityIndex].GetName()
-        switch (e.key) {
-            case "Backspace":
-                newName =newName.length > 0 ?  newName.substring(0, newName.length - 1) : ""
-                break
-            default:
-                newName += e.key
+        if (controlKeys.has(e.key)) {
+            return
         }
 
-        entities[editedEntityIndex].SetName(newName)
-        requestAnimationFrame(() => entities[editedEntityIndex].Render(getCanvasCtx()))
+        const canvasCtx = getCanvasCtx()
+        let curName = entities[editedEntityIndex].GetName()
+        let metaAPressed = false
+
+        if (cursor.IsLetterIndexUnset()) {
+            cursor.SetLetterIndex(curName.length)
+            updateCursor()
+        }
+
+        // TODO: separate entities parts somehow (e.g. getEditedPart method on entity)
+        switch (e.key) {
+            case "Enter":
+                inEditMode = false
+                return
+            case "Backspace":
+                if (cursorWholeTextSelected) {
+                    curName = ""
+                    cursor.SetLetterIndex(0)
+                    break
+                }
+
+                curName = curName.substring(0, cursor.GetLetterIndex()-1) + curName.slice(cursor.GetLetterIndex())
+                cursor.MoveLetterIndex(-1)
+                break
+            case "ArrowLeft":
+                cursorWholeTextSelected ?
+                    cursor.SetLetterIndex(0) :
+                    cursor.MoveLetterIndex(-1)
+                break
+            case "ArrowRight":
+                cursorWholeTextSelected ?
+                    cursor.SetLetterIndex(curName.length) :
+                    cursor.MoveLetterIndex(1, curName.length)
+                break
+            case "a":
+                if (e.metaKey) {
+                    metaAPressed = true
+                    cursor.Reset()
+                    // disable background cursor rendering to preserve highlighting
+                    cancelAnimationFrame(lastFrameID)
+                    break
+                }
+            default:
+                curName = curName.slice(0, cursor.GetLetterIndex()) + e.key + curName.slice(cursor.GetLetterIndex())
+                cursor.GetLetterIndex() >= 0 ? cursor.MoveLetterIndex(1, curName.length) : cursor.SetLetterIndex(curName.length)
+        }
+
+        cursorWholeTextSelected = metaAPressed
+
+        const curEntityPosition = entities[editedEntityIndex].GetPosition()
+        const wholeTextInfo = canvasCtx.measureText(curName)
+        const offsetTextInfo = canvasCtx.measureText(curName.slice(cursor.GetLetterIndex()))
+
+        cursor.SetPosition(curEntityPosition.Translate(wholeTextInfo.width / 2 - offsetTextInfo.width, -8))
+
+        entities[editedEntityIndex].SetName(curName)
+        animate(() => {
+            entities[editedEntityIndex].Clear(canvasCtx)
+            entities[editedEntityIndex].Render(canvasCtx)
+            if (cursorWholeTextSelected) {
+                (entities[editedEntityIndex] as CrowsFootNotation.Entity).HighlightHeader(canvasCtx)
+            }
+
+            cursor.Update(canvasCtx, !cursorWholeTextSelected)
+        })
     }
 
     const addEntityOnClick = (e: MouseEvent<HTMLCanvasElement>) => {
         entities.push(new CrowsFootNotation.Entity("random", e.clientX, e.clientY))
-        lastFrameID = requestAnimationFrame(renderEntities)
+        animate(renderEntities)
     }
 
     const handleEditOnDoubleClick = (e: MouseEvent<HTMLCanvasElement>) => {
@@ -168,8 +264,8 @@ export default function Canvas() {
         )
 
         if (editHeader) {
-            lastFrameID = requestAnimationFrame(() => {
-                // TODO: maybe clear canvas as well to avoid multi-highlighting
+            cursorWholeTextSelected = true
+            animate(() => {
                 (entities[editedEntityIndex] as CrowsFootNotation.Entity).HighlightHeader(canvasCtx)
             })
         }
@@ -182,7 +278,8 @@ export default function Canvas() {
         if (inEditMode) {
             inEditMode = false
             // remove highlight on edit mode exit
-            lastFrameID = requestAnimationFrame(renderEntities)
+            animate(renderEntities)
+
             return
         }
 
@@ -197,7 +294,7 @@ export default function Canvas() {
             return
         }
 
-        lastFrameID = requestAnimationFrame(updateEntityPositionOnDrag)
+        animate(updateEntityPositionOnDrag)
     }
 
     const dropEntityOnMouseUp = (e: MouseEvent<HTMLCanvasElement>) => {

@@ -60,6 +60,12 @@ export namespace CrowsFootNotation {
             ctx.fillStyle = "black"
             ctx.textAlign = "center"
             ctx.fillText(this.name, this.position.x, this.position.y, this.curWidth)
+
+            ctx.textAlign = "left"
+        }
+
+        Clear(this: Entity, ctx: CanvasRenderingContext2D) {
+            ctx.clearRect(this.position.x, this.position.y, this.curWidth, this.GetHeight())
         }
     }
 }
