@@ -1,6 +1,6 @@
 "use client"
 
-import { MouseEvent, RefObject, useEffect, useRef } from "react"
+import { KeyboardEvent, MouseEvent, RefObject, useEffect, useRef } from "react"
 
 import styles from "./Canvas.module.scss"
 import { BaseEntity } from "@/libs/erd/base_entity"
@@ -20,10 +20,16 @@ export default function Canvas() {
     const canvasCtxRef: RefObject<CanvasRenderingContext2D> | RefObject<null> = useRef(null)
 
     // state variables
+    // save entities and current notation to local storage and upload from there on startup
     const entities = new Array<BaseEntity>()
-    const currentNotation = CrowsFootNotation.GetNotationName()
+    let currentNotation = CrowsFootNotation.GetNotationName()
+
+    let inEditMode = false
+
     let draggedEntityOffset: Point | null = null
     let draggedEntityIndex = -1
+    let editedEntityIndex = -1
+
     let lastFrameID = 0
     let lastMouseDownTimestamp = 0
 
@@ -114,6 +120,25 @@ export default function Canvas() {
         lastFrameID = requestAnimationFrame(updateEntityPositionOnDrag)
     }
 
+    const updateEntityHeaderOnKeyPress = (e: KeyboardEvent<HTMLCanvasElement>) => {
+        if (!inEditMode || editedEntityIndex === -1) {
+            return
+        }
+
+        // TODO: separate entities parts somehow (e.g. getEditedPart method on entity)
+        let newName = entities[editedEntityIndex].GetName()
+        switch (e.key) {
+            case "Backspace":
+                newName =newName.length > 0 ?  newName.substring(0, newName.length - 1) : ""
+                break
+            default:
+                newName += e.key
+        }
+
+        entities[editedEntityIndex].SetName(newName)
+        requestAnimationFrame(() => entities[editedEntityIndex].Render(getCanvasCtx()))
+    }
+
     const addEntityOnClick = (e: MouseEvent<HTMLCanvasElement>) => {
         entities.push(new CrowsFootNotation.Entity("random", e.clientX, e.clientY))
         lastFrameID = requestAnimationFrame(renderEntities)
@@ -123,26 +148,25 @@ export default function Canvas() {
         cancelAnimationFrame(lastFrameID)
         draggedEntityIndex = -1
 
-        console.log("double click")
-
-        const editedEntityIndex = getInteractedEntity(e)
+        editedEntityIndex = getInteractedEntity(e)
         if (editedEntityIndex === -1) {
             addEntityOnClick(e)
             return
         }
-
 
         // support multi-notation here
         if (currentNotation !== CrowsFootNotation.GetNotationName()) {
             return
         }
 
-        const canvasCtx = getCanvasCtx()
+        inEditMode = true
 
+        const canvasCtx = getCanvasCtx()
         const editHeader = PointWithRectCollides(
             new Point(e.clientX, e.clientY),
             new Rectangle(entities[editedEntityIndex].GetCenteredPosition(), entities[editedEntityIndex].GetWidth(), entities[editedEntityIndex].GetHeaderHeight()),
         )
+
         if (editHeader) {
             lastFrameID = requestAnimationFrame(() => {
                 // TODO: maybe clear canvas as well to avoid multi-highlighting
@@ -154,6 +178,13 @@ export default function Canvas() {
     const dragEntityOnMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
         const isDoubleClick = e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS
         lastMouseDownTimestamp = e.timeStamp
+
+        if (inEditMode) {
+            inEditMode = false
+            // remove highlight on edit mode exit
+            lastFrameID = requestAnimationFrame(renderEntities)
+            return
+        }
 
         if (isDoubleClick) {
             handleEditOnDoubleClick(e)
@@ -181,8 +212,11 @@ export default function Canvas() {
 
     return (
         <canvas
+            // tabIndex enables keys events
+            tabIndex={1}
             onMouseDown={dragEntityOnMouseDown}
             onMouseUp={dropEntityOnMouseUp}
+            onKeyDown={updateEntityHeaderOnKeyPress}
             className={styles.canvas}
             ref={canvasRef}
         >
