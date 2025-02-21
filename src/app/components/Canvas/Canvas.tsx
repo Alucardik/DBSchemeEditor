@@ -5,10 +5,10 @@ import { KeyboardEvent, MouseEvent, RefObject, useEffect, useRef } from "react"
 import styles from "./Canvas.module.scss"
 import { BaseEntity } from "@/libs/erd/base_entity"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
-import { PointWithRectCollides } from "@/libs/render/collisions"
-import { Point, Rectangle } from "@/libs/render/shapes"
+import { Point } from "@/libs/render/shapes"
 import useMousePosition from "@/app/hooks/use_mouse_position"
 import { Cursor } from "@/libs/render/cursor"
+import type { Optional } from "@/libs/utils/types"
 
 
 const controlKeys = new Set(["Shift", "Control", "Alt", "Meta", "ArrowUp", "ArrowDown"])
@@ -19,8 +19,8 @@ export default function Canvas() {
 
     // refs
     const mousePositionRef = useMousePosition()
-    const canvasRef: RefObject<HTMLCanvasElement> | RefObject<null> = useRef(null)
-    const canvasCtxRef: RefObject<CanvasRenderingContext2D> | RefObject<null> = useRef(null)
+    const canvasRef: RefObject<Optional<HTMLCanvasElement>> = useRef(null)
+    const canvasCtxRef: RefObject<Optional<CanvasRenderingContext2D>> = useRef(null)
 
     // state variables
     // TODO: save entities and current notation to local storage and upload from there on startup
@@ -28,11 +28,12 @@ export default function Canvas() {
     let currentNotation = CrowsFootNotation.GetNotationName()
 
     const cursor = new Cursor()
+    // TODO: encapsulate state variable in cursor class
     let cursorWholeTextSelected = false
 
     let inEditMode = false
 
-    let draggedEntityOffset: Point | null = null
+    let draggedEntityOffset: Optional<Point> = null
     let draggedEntityIndex = -1
     let editedEntityIndex = -1
 
@@ -102,12 +103,9 @@ export default function Canvas() {
         }
     }
 
-    const getInteractedEntity =  (e: MouseEvent<HTMLCanvasElement>) => {
+    const getEntityBeingEdited =  (e: MouseEvent<HTMLCanvasElement>) => {
         return entities.findIndex((entity: BaseEntity) =>
-            PointWithRectCollides(
-                new Point(e.clientX, e.clientY),
-                new Rectangle(entity.GetCenteredPosition(), entity.GetWidth(), entity.GetHeight()),
-            ),
+            entity.GetInteractedPart(new Point(e.clientX, e.clientY))
         )
     }
 
@@ -159,7 +157,7 @@ export default function Canvas() {
         animate(updateEntityPositionOnDrag)
     }
 
-    const updateEntityHeaderOnKeyPress = (e: KeyboardEvent<HTMLCanvasElement>) => {
+    const updateEntityPartOnKeyPress = (e: KeyboardEvent<HTMLCanvasElement>) => {
         if (!inEditMode || editedEntityIndex === -1) {
             return
         }
@@ -169,7 +167,9 @@ export default function Canvas() {
         }
 
         const canvasCtx = getCanvasCtx()
-        let curName = entities[editedEntityIndex].GetName()
+        const editedEntity = entities[editedEntityIndex]
+
+        let curName = editedEntity.GetName()
         let metaAPressed = false
 
         if (cursor.IsLetterIndexUnset()) {
@@ -177,8 +177,9 @@ export default function Canvas() {
             updateCursor()
         }
 
-        // TODO: separate entities parts somehow (e.g. getEditedPart method on entity)
+        // TODO: move to a separate handle textInput func
         switch (e.key) {
+            case "Escape":
             case "Enter":
                 inEditMode = false
                 return
@@ -217,18 +218,21 @@ export default function Canvas() {
 
         cursorWholeTextSelected = metaAPressed
 
-        const curEntityPosition = entities[editedEntityIndex].GetPosition()
-        const wholeTextInfo = canvasCtx.measureText(curName)
-        const offsetTextInfo = canvasCtx.measureText(curName.slice(cursor.GetLetterIndex()))
+        const selectedPartPosition = editedEntity.GetSelectedPartTextPosition()
+        if (selectedPartPosition) {
+            const wholeTextInfo = canvasCtx.measureText(curName)
+            const offsetTextInfo = canvasCtx.measureText(curName.slice(cursor.GetLetterIndex()))
 
-        cursor.SetPosition(curEntityPosition.Translate(wholeTextInfo.width / 2 - offsetTextInfo.width, -8))
+            cursor.SetPosition(selectedPartPosition.Translate(wholeTextInfo.width / 2 - offsetTextInfo.width, -8))
+        }
 
-        entities[editedEntityIndex].SetName(curName)
+        editedEntity.SetName(curName)
         animate(() => {
-            entities[editedEntityIndex].Clear(canvasCtx)
-            entities[editedEntityIndex].Render(canvasCtx)
-            if (cursorWholeTextSelected) {
-                (entities[editedEntityIndex] as CrowsFootNotation.Entity).HighlightHeader(canvasCtx)
+            const selectedPartName = editedEntity.GetSelectedPartName()
+            editedEntity.Clear(canvasCtx)
+            editedEntity.Render(canvasCtx)
+            if (cursorWholeTextSelected && selectedPartName) {
+                editedEntity.SelectPart(selectedPartName, canvasCtx)
             }
 
             cursor.Update(canvasCtx, !cursorWholeTextSelected)
@@ -236,7 +240,9 @@ export default function Canvas() {
     }
 
     const addEntityOnClick = (e: MouseEvent<HTMLCanvasElement>) => {
-        entities.push(new CrowsFootNotation.Entity("random", e.clientX, e.clientY))
+        const newEntity = new CrowsFootNotation.Entity("random", 0, 0)
+        newEntity.SetPosition(e.clientX - newEntity.GetWidth() / 2, e.clientY - newEntity.GetHeight() / 2)
+        entities.push(newEntity)
         animate(renderEntities)
     }
 
@@ -244,7 +250,7 @@ export default function Canvas() {
         cancelAnimationFrame(lastFrameID)
         draggedEntityIndex = -1
 
-        editedEntityIndex = getInteractedEntity(e)
+        editedEntityIndex = getEntityBeingEdited(e)
         if (editedEntityIndex === -1) {
             addEntityOnClick(e)
             return
@@ -258,15 +264,13 @@ export default function Canvas() {
         inEditMode = true
 
         const canvasCtx = getCanvasCtx()
-        const editHeader = PointWithRectCollides(
-            new Point(e.clientX, e.clientY),
-            new Rectangle(entities[editedEntityIndex].GetCenteredPosition(), entities[editedEntityIndex].GetWidth(), entities[editedEntityIndex].GetHeaderHeight()),
-        )
 
-        if (editHeader) {
+        const interactedPart = entities[editedEntityIndex].GetInteractedPart(new Point(e.clientX, e.clientY))
+        if (interactedPart) {
+            console.log(interactedPart)
             cursorWholeTextSelected = true
             animate(() => {
-                (entities[editedEntityIndex] as CrowsFootNotation.Entity).HighlightHeader(canvasCtx)
+                entities[editedEntityIndex].SelectPart(interactedPart.name, canvasCtx)
             })
         }
     }
@@ -288,7 +292,7 @@ export default function Canvas() {
             return
         }
 
-        draggedEntityIndex = getInteractedEntity(e)
+        draggedEntityIndex = getEntityBeingEdited(e)
         if (draggedEntityIndex === -1) {
             addEntityOnClick(e)
             return
@@ -313,7 +317,7 @@ export default function Canvas() {
             tabIndex={1}
             onMouseDown={dragEntityOnMouseDown}
             onMouseUp={dropEntityOnMouseUp}
-            onKeyDown={updateEntityHeaderOnKeyPress}
+            onKeyDown={updateEntityPartOnKeyPress}
             className={styles.canvas}
             ref={canvasRef}
         >

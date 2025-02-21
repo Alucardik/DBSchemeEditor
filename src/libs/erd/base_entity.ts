@@ -1,16 +1,25 @@
-import { Point } from "@/libs/render/shapes"
+import { Point, Shape } from "@/libs/render/shapes"
+import type { Optional } from "@/libs/utils/types"
+
+export class EntityPart<S extends Shape> {
+    readonly name: string
+    readonly shape: S
+
+    constructor(name: string, shape: S) {
+        this.name = name
+        this.shape = shape
+    }
+}
 
 export abstract class BaseEntity {
     private static counter: number = 0
 
     protected readonly id: number
     protected name: string
-    protected position: Point
 
-    constructor(name: string, x: number = 0, y: number = 0) {
+    protected constructor(name: string, x: number = 0, y: number = 0) {
         this.name = name
         this.id = BaseEntity.counter
-        this.position = new Point(x, y)
 
         BaseEntity.counter++
     }
@@ -23,18 +32,17 @@ export abstract class BaseEntity {
         this.name = name
     }
 
-    GetPosition(this: BaseEntity) {
-        return this.position
-    }
+    abstract GetPosition(this: BaseEntity): Point
 
-    SetPosition(this: BaseEntity, x: number, y: number){
-        this.position.x = x
-        this.position.y = y
-    }
+    abstract SetPosition(this: BaseEntity, x: number, y: number): void
 
-    abstract GetHeaderHeight(this: BaseEntity): number
+    abstract GetInteractedPart(this: BaseEntity, p: Point): Optional<EntityPart<Shape>>
 
-    abstract GetCenteredPosition(this: BaseEntity): Point
+    abstract SelectPart(this: BaseEntity, partName: string, ctx: CanvasRenderingContext2D): void
+
+    abstract GetSelectedPartName(this: BaseEntity): Optional<string>
+
+    abstract GetSelectedPartTextPosition(this: BaseEntity): Optional<Point>
 
     abstract GetWidth(this: BaseEntity): number
 
