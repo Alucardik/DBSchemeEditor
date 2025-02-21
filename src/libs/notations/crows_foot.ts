@@ -1,5 +1,6 @@
 import { BaseEntity } from "@/libs/erd/base_entity"
 import { Point } from "@/libs/render/shapes"
+import { resetCanvasContextProps } from "@/libs/render/canvas"
 
 export namespace CrowsFootNotation {
     export function GetNotationName() {
@@ -46,7 +47,6 @@ export namespace CrowsFootNotation {
         Render(this: Entity, ctx: CanvasRenderingContext2D) {
             const centeredPos = this.GetCenteredPosition()
 
-            // TODO: write function to reset fill styles to default values
             ctx.fillStyle = "white"
 
             // header
@@ -61,7 +61,7 @@ export namespace CrowsFootNotation {
             ctx.textAlign = "center"
             ctx.fillText(this.name, this.position.x, this.position.y, this.curWidth)
 
-            ctx.textAlign = "left"
+            resetCanvasContextProps(ctx)
         }
 
         Clear(this: Entity, ctx: CanvasRenderingContext2D) {

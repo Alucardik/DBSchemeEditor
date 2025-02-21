@@ -1,4 +1,5 @@
 import { Point } from "@/libs/render/shapes"
+import { resetCanvasContextProps } from "@/libs/render/canvas"
 
 export class Cursor {
     private readonly updateDurationMS = 500
@@ -49,9 +50,8 @@ export class Cursor {
         }
 
         this.state ? ctx.fillStyle = "black" : ctx.fillStyle = "transparent"
-
         ctx.fillRect(this.position.x, this.position.y, 1, 10)
-        ctx.fillStyle = "black"
+        resetCanvasContextProps(ctx)
     }
 
     SetPosition(this: Cursor, position: Point) {
