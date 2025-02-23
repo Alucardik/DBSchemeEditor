@@ -1,60 +1,115 @@
 import { Point } from "@/libs/render/shapes"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
+import { Key } from "../utils/keys_enums"
+import type { KeyboardEvent } from "react"
 
 export class Cursor {
     private readonly updateDurationMS = 500
     private updateTimestampMS = 0
     private letterIndex = -1
-    private state = 1
+    private visible = true
     private position = new Point(-1, -1)
+    private editedString: string = ""
+    private wholeTextSelected: boolean = true
+
+    private MoveLetterIndex(this: Cursor, delta: number) {
+        this.letterIndex += delta
+        this.letterIndex = Math.max(0, this.letterIndex)
+
+        if (this.editedString.length > 0) {
+            this.letterIndex = Math.min(this.letterIndex, this.editedString.length)
+        }
+    }
+
+    IsUnset(this: Cursor) {
+        return this.letterIndex === -1
+    }
 
     Reset(this: Cursor) {
         this.letterIndex = -1
         this.updateTimestampMS = 0
-        this.state = 1
+        this.visible = true
         this.position.Set(-1, -1)
+        this.wholeTextSelected = true
     }
 
-    GetLetterIndex(this: Cursor) {
-        return this.letterIndex
+    GetEditedString(this: Cursor): string {
+        return this.editedString
     }
 
-    IsLetterIndexUnset(this: Cursor) {
-        return this.letterIndex === -1
+    SetEditedString(this: Cursor, editedString: string) {
+        this.editedString = editedString
+        this.letterIndex = this.editedString.length
     }
 
-    SetLetterIndex(this: Cursor, index: number) {
-        this.letterIndex = index
-    }
+    HandleKeyInput(this: Cursor, e: KeyboardEvent): boolean {
+        let metaAPressed = false
 
-    MoveLetterIndex(this: Cursor, delta: number, maxLetterIndex: number = -1) {
-        this.letterIndex += delta
-        this.letterIndex = Math.max(0, this.letterIndex)
-        
-        if (maxLetterIndex > 0) {
-            this.letterIndex = Math.min(this.letterIndex, maxLetterIndex)
+        switch (e.key) {
+            case Key.Backspace:
+                if (this.wholeTextSelected) {
+                    this.editedString = ""
+                    this.letterIndex = 0
+                    break
+                }
+
+                this.editedString = this.editedString.slice(0, this.letterIndex-1) + this.editedString.slice(this.letterIndex)
+                this.MoveLetterIndex(-1)
+                break
+            case Key.ArrowLeft:
+                this.wholeTextSelected ?
+                    this.letterIndex = 0 :
+                    this.MoveLetterIndex(-1)
+                break
+            case Key.ArrowRight:
+                this.wholeTextSelected ?
+                    this.letterIndex = this.editedString.length :
+                    this.MoveLetterIndex(1)
+                break
+            case "a":
+                if (e.metaKey) {
+                    metaAPressed = true
+                    this.Reset()
+                    break
+                }
+            default:
+                if (this.wholeTextSelected) {
+                    this.editedString = e.key
+                    this.letterIndex = 1
+                } else {
+                    this.editedString = this.editedString.slice(0, this.letterIndex) + e.key + this.editedString.slice(this.letterIndex)
+                    this.letterIndex >= 0 ? this.MoveLetterIndex(1) : this.letterIndex = this.editedString.length
+                }
         }
 
+        this.wholeTextSelected = metaAPressed
+
+        return metaAPressed
     }
 
     IsUpdateNeeded(this: Cursor) {
-        return Date.now() - this.updateTimestampMS >= this.updateDurationMS
+        return Date.now() - this.updateTimestampMS >= this.updateDurationMS && !this.wholeTextSelected
     }
 
-    Update(this: Cursor, ctx: CanvasRenderingContext2D, force: boolean = false) {
+    UpdatePosition(this: Cursor, textPosition: Point, ctx: CanvasRenderingContext2D) {
+        const wholeTextInfo = ctx.measureText(this.editedString)
+        const offsetTextInfo = ctx.measureText(this.editedString.slice(this.letterIndex))
+
+        // TODO: parse font height
+        this.position.x = textPosition.x + wholeTextInfo.width / 2 - offsetTextInfo.width
+        this.position.y = textPosition.y - 8
+    }
+
+    Render(this: Cursor, ctx: CanvasRenderingContext2D, forceVisible: boolean = false) {
         this.updateTimestampMS = Date.now()
 
-        this.state = (this.state + 1) % 2
-        if (force) {
-            this.state = 1
+        this.visible = !this.visible
+        if (forceVisible) {
+            this.visible = true
         }
 
-        this.state ? ctx.fillStyle = "black" : ctx.fillStyle = "transparent"
+        this.visible ? ctx.fillStyle = "black" : ctx.fillStyle = "transparent"
         ctx.fillRect(this.position.x, this.position.y, 1, 10)
         resetCanvasContextProps(ctx)
-    }
-
-    SetPosition(this: Cursor, position: Point) {
-        this.position = position
     }
 }

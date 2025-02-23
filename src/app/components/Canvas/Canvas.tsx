@@ -9,6 +9,7 @@ import { Point } from "@/libs/render/shapes"
 import useMousePosition from "@/app/hooks/use_mouse_position"
 import { Cursor } from "@/libs/render/cursor"
 import type { Optional } from "@/libs/utils/types"
+import { Key } from "@/libs/utils/keys_enums"
 
 
 const controlKeys = new Set(["Shift", "Control", "Alt", "Meta", "ArrowUp", "ArrowDown"])
@@ -28,8 +29,6 @@ export default function Canvas() {
     let currentNotation = CrowsFootNotation.GetNotationName()
 
     const cursor = new Cursor()
-    // TODO: encapsulate state variable in cursor class
-    let cursorWholeTextSelected = false
 
     let inEditMode = false
 
@@ -119,10 +118,10 @@ export default function Canvas() {
 
         entities[editedEntityIndex].Clear(canvasCtx)
         entities[editedEntityIndex].Render(canvasCtx)
-        cursor.Update(canvasCtx)
+        cursor.Render(canvasCtx)
     }
 
-    const updateCursor = () => {
+    const animateCursor = () => {
         // erase leftover cursor
         if (!inEditMode) {
             cursor.Reset()
@@ -135,7 +134,7 @@ export default function Canvas() {
             renderCursor()
         }
 
-        animate(updateCursor)
+        animate(animateCursor)
     }
 
     const updateEntityPositionOnDrag = () => {
@@ -166,76 +165,47 @@ export default function Canvas() {
             return
         }
 
-        const canvasCtx = getCanvasCtx()
         const editedEntity = entities[editedEntityIndex]
+        const selectedPart = editedEntity.GetSelectedPart()
 
-        let curName = editedEntity.GetName()
+        if (!selectedPart) {
+            return
+        }
+
+        if (cursor.IsUnset()) {
+            cursor.SetEditedString(selectedPart.GetText())
+            animateCursor()
+        }
+
         let metaAPressed = false
 
-        if (cursor.IsLetterIndexUnset()) {
-            cursor.SetLetterIndex(curName.length)
-            updateCursor()
-        }
-
-        // TODO: move to a separate handle textInput func
         switch (e.key) {
-            case "Escape":
-            case "Enter":
+            case Key.Escape:
+            case Key.Enter:
                 inEditMode = false
                 return
-            case "Backspace":
-                if (cursorWholeTextSelected) {
-                    curName = ""
-                    cursor.SetLetterIndex(0)
-                    break
-                }
-
-                curName = curName.substring(0, cursor.GetLetterIndex()-1) + curName.slice(cursor.GetLetterIndex())
-                cursor.MoveLetterIndex(-1)
-                break
-            case "ArrowLeft":
-                cursorWholeTextSelected ?
-                    cursor.SetLetterIndex(0) :
-                    cursor.MoveLetterIndex(-1)
-                break
-            case "ArrowRight":
-                cursorWholeTextSelected ?
-                    cursor.SetLetterIndex(curName.length) :
-                    cursor.MoveLetterIndex(1, curName.length)
-                break
-            case "a":
-                if (e.metaKey) {
-                    metaAPressed = true
-                    cursor.Reset()
-                    // disable background cursor rendering to preserve highlighting
-                    cancelAnimationFrame(lastFrameID)
-                    break
-                }
             default:
-                curName = curName.slice(0, cursor.GetLetterIndex()) + e.key + curName.slice(cursor.GetLetterIndex())
-                cursor.GetLetterIndex() >= 0 ? cursor.MoveLetterIndex(1, curName.length) : cursor.SetLetterIndex(curName.length)
+                metaAPressed = cursor.HandleKeyInput(e)
         }
 
-        cursorWholeTextSelected = metaAPressed
+        const canvasCtx = getCanvasCtx()
+        const selectedPartTextPosition = editedEntity.GetSelectedPartTextPosition()
 
-        const selectedPartPosition = editedEntity.GetSelectedPartTextPosition()
-        if (selectedPartPosition) {
-            const wholeTextInfo = canvasCtx.measureText(curName)
-            const offsetTextInfo = canvasCtx.measureText(curName.slice(cursor.GetLetterIndex()))
-
-            cursor.SetPosition(selectedPartPosition.Translate(wholeTextInfo.width / 2 - offsetTextInfo.width, -8))
+        if (selectedPartTextPosition) {
+            cursor.UpdatePosition(selectedPartTextPosition, canvasCtx)
         }
 
-        editedEntity.SetName(curName)
+        selectedPart.SetText(cursor.GetEditedString())
+
         animate(() => {
-            const selectedPartName = editedEntity.GetSelectedPartName()
             editedEntity.Clear(canvasCtx)
             editedEntity.Render(canvasCtx)
-            if (cursorWholeTextSelected && selectedPartName) {
-                editedEntity.SelectPart(selectedPartName, canvasCtx)
+            
+            if (metaAPressed) {
+                editedEntity.SelectPart(selectedPart.name, canvasCtx)
             }
 
-            cursor.Update(canvasCtx, !cursorWholeTextSelected)
+            cursor.Render(canvasCtx, !metaAPressed)
         })
     }
 
@@ -267,8 +237,6 @@ export default function Canvas() {
 
         const interactedPart = entities[editedEntityIndex].GetInteractedPart(new Point(e.clientX, e.clientY))
         if (interactedPart) {
-            console.log(interactedPart)
-            cursorWholeTextSelected = true
             animate(() => {
                 entities[editedEntityIndex].SelectPart(interactedPart.name, canvasCtx)
             })

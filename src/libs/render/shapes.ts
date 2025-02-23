@@ -84,6 +84,33 @@ class Ellipse implements Shape {
     }
 }
 
+// class MultiShape implements Shape {
+//     private shapes: Shape[]
+//
+//     AddShapes(this: MultiShape, ...shapes: Shape[]) {
+//         this.shapes.push(...shapes)
+//     }
+//
+//     GetPivotPoint(this: MultiShape): Point {
+//         if (this.shapes.length > 0) {
+//             return this.shapes[0].GetPivotPoint()
+//         }
+//
+//         return new Point(-1, -1)
+//     }
+//
+//     ContainsPoint(this: MultiShape, point: Point): boolean {
+//         return this.shapes
+//     }
+//
+//     Render(this: MultiShape, ctx: CanvasRenderingContext2D, withOutline: boolean = false): void {
+//
+//     }
+//
+// }
+
+
+
 export type {
     Shape,
 }

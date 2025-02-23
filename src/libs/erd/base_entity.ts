@@ -5,9 +5,21 @@ export class EntityPart<S extends Shape> {
     readonly name: string
     readonly shape: S
 
-    constructor(name: string, shape: S) {
+    private text: string
+    // TODO: maybe save styles here instead of the whole entity
+
+    constructor(name: string, shape: S, text: string = "") {
         this.name = name
         this.shape = shape
+        this.text = text
+    }
+
+    GetText(this: EntityPart<S>): string {
+        return this.text
+    }
+
+    SetText(this: EntityPart<S>, text: string) {
+        this.text = text
     }
 }
 
@@ -17,7 +29,7 @@ export abstract class BaseEntity {
     protected readonly id: number
     protected name: string
 
-    protected constructor(name: string, x: number = 0, y: number = 0) {
+    protected constructor(name: string) {
         this.name = name
         this.id = BaseEntity.counter
 
@@ -40,7 +52,7 @@ export abstract class BaseEntity {
 
     abstract SelectPart(this: BaseEntity, partName: string, ctx: CanvasRenderingContext2D): void
 
-    abstract GetSelectedPartName(this: BaseEntity): Optional<string>
+    abstract GetSelectedPart(this: BaseEntity): Optional<EntityPart<Shape>>
 
     abstract GetSelectedPartTextPosition(this: BaseEntity): Optional<Point>
 

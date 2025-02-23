@@ -1,3 +1,4 @@
+// TODO: support partial props resets
 function resetCanvasContextProps(ctx: CanvasRenderingContext2D) {
     ctx.direction = "inherit"
     ctx.fillStyle = "#000"

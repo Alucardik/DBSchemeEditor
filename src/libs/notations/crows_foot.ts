@@ -13,59 +13,96 @@ export namespace CrowsFootNotation {
         private readonly minAttributesHeight = 50
         private readonly headerHeight = 30
 
-        private readonly headerPart:  EntityPart<Rectangle>
-        private readonly attributesPart: EntityPart<Rectangle>
+        private readonly header:  EntityPart<Rectangle>
+        private readonly attributesContainer: EntityPart<Rectangle>
         private selectedPartName: Optional<string>
         // TODO: save styles, related to each entity rather than context
 
         constructor(name: string, x: number = 0, y: number = 0) {
-            super(name, x, y)
-            this.headerPart = new EntityPart("header", new Rectangle(x, y, this.minWidth, this.headerHeight))
-            this.attributesPart = new EntityPart("attributes", new Rectangle(x, y + this.headerHeight, this.minWidth, this.minAttributesHeight))
+            super(name)
+
+            this.header = new EntityPart("header", new Rectangle(x, y, this.minWidth, this.headerHeight))
+            this.attributesContainer = new EntityPart("attributes", new Rectangle(x, y + this.headerHeight, this.minWidth, this.minAttributesHeight))
             this.selectedPartName = null
+
+            this.header.SetText(this.name)
         }
 
         private GetHeaderTextPosition(): Point {
-            return this.headerPart.shape.GetPivotPoint().Translate(
-                this.headerPart.shape.width / 2,
-                this.headerPart.shape.height / 2,
+            return this.header.shape.GetPivotPoint().Translate(
+                this.header.shape.width / 2,
+                this.header.shape.height / 2,
             )
         }
 
         private GetAttributesTextPosition(): Point {
-            return this.attributesPart.shape.GetPivotPoint().Translate(0, 0)
+            return this.attributesContainer.shape.GetPivotPoint().Translate(
+                this.attributesContainer.shape.width / 2,
+                this.attributesContainer.shape.height / 2,
+            )
+        }
+
+        private RenderHeader(this: Entity, ctx: CanvasRenderingContext2D) {
+            const headerTextPos = this.GetHeaderTextPosition()
+
+            ctx.fillStyle = "white"
+            this.header.shape.Render(ctx, true)
+
+            ctx.fillStyle = "black"
+            ctx.textAlign = "center"
+            ctx.fillText(this.header.GetText(), headerTextPos.x, headerTextPos.y, this.GetWidth())
+
+            resetCanvasContextProps(ctx)
+        }
+
+        private RenderAttributes(this: Entity, ctx: CanvasRenderingContext2D) {
+            const attributesTextPos = this.GetAttributesTextPosition()
+
+            ctx.fillStyle = "white"
+            this.attributesContainer.shape.Render(ctx, true)
+
+            ctx.fillStyle = "black"
+            ctx.textAlign = "center"
+            ctx.fillText(this.attributesContainer.GetText(), attributesTextPos.x, attributesTextPos.y, this.GetWidth())
+
+            resetCanvasContextProps(ctx)
+        }
+
+        override SetName(this: Entity, name: string) {
+            super.SetName(name)
+            this.header.SetText(name)
         }
 
         GetPosition(): Point {
-            return this.headerPart.shape.GetPivotPoint()
+            return this.header.shape.GetPivotPoint()
         }
 
         SetPosition(x: number, y: number) {
-            this.headerPart.shape.topLeftCorner.Set(x, y)
-            this.attributesPart.shape.topLeftCorner.Set(x, y + this.headerPart.shape.height)
+            this.header.shape.topLeftCorner.Set(x, y)
+            this.attributesContainer.shape.topLeftCorner.Set(x, y + this.header.shape.height)
         }
 
         GetInteractedPart(this: Entity, p: Point): Optional<EntityPart<Rectangle>> {
-            if (this.headerPart.shape.ContainsPoint(p)) {
-                return this.headerPart
+            if (this.header.shape.ContainsPoint(p)) {
+                return this.header
             }
 
-            if (this.attributesPart.shape.ContainsPoint(p)) {
-                return this.attributesPart
+            if (this.attributesContainer.shape.ContainsPoint(p)) {
+                return this.attributesContainer
             }
 
             return null
         }
 
         SelectPart(this: Entity, partName: string, ctx: CanvasRenderingContext2D) {
-            if (partName !== this.headerPart.name) {
+            if (partName !== this.header.name) {
                 this.selectedPartName = null
                 return
             }
 
-            this.selectedPartName = this.headerPart.name
+            this.selectedPartName = this.header.name
 
-            const textWidth = ctx.measureText(this.name).width + 8
+            const textWidth = ctx.measureText(this.header.GetText()).width + 8
             const headerTextPos = this.GetHeaderTextPosition()
             const fontHeight = 10
 
@@ -78,15 +115,23 @@ export namespace CrowsFootNotation {
             resetCanvasContextProps(ctx)
         }
 
-        GetSelectedPartName(this: Entity): Optional<string> {
-            return this.selectedPartName
+        GetSelectedPart(this: Entity): Optional<EntityPart<Rectangle>> {
+            switch (this.selectedPartName) {
+                case this.header.name:
+                    return this.header
+                case this.attributesContainer.name:
+                    return this.attributesContainer
+                default:
+                    return null
+            }
         }
 
+        // TODO: merge with the method above
         GetSelectedPartTextPosition(this: Entity): Optional<Point> {
             switch (this.selectedPartName) {
-                case this.headerPart.name:
+                case this.header.name:
                     return this.GetHeaderTextPosition()
-                case this.attributesPart.name:
+                case this.attributesContainer.name:
                     return this.GetAttributesTextPosition()
                 default:
                     return null
@@ -94,28 +139,20 @@ export namespace CrowsFootNotation {
         }
 
         GetWidth(this: Entity): number {
-            return Math.max(this.headerPart.shape.width, this.attributesPart.shape.width)
+            return Math.max(this.header.shape.width, this.attributesContainer.shape.width)
         }
 
         GetHeight(this: Entity): number {
-            return this.headerPart.shape.height + this.attributesPart.shape.height
+            return this.header.shape.height + this.attributesContainer.shape.height
         }
 
         Render(this: Entity, ctx: CanvasRenderingContext2D) {
-            ctx.fillStyle = "white"
-            this.headerPart.shape.Render(ctx, true)
-            this.attributesPart.shape.Render(ctx, true)
-
-            const headerTextPos = this.GetHeaderTextPosition()
-            ctx.fillStyle = "black"
-            ctx.textAlign = "center"
-            ctx.fillText(this.name, headerTextPos.x, headerTextPos.y, this.GetWidth())
-
-            resetCanvasContextProps(ctx)
+            this.RenderHeader(ctx)
+            this.RenderAttributes(ctx)
         }
 
         Clear(this: Entity, ctx: CanvasRenderingContext2D) {
-            ctx.clearRect(this.headerPart.shape.topLeftCorner.x, this.headerPart.shape.topLeftCorner.y, this.GetWidth(), this.GetHeight())
+            ctx.clearRect(this.header.shape.topLeftCorner.x, this.header.shape.topLeftCorner.y, this.GetWidth(), this.GetHeight())
         }
     }
 }
