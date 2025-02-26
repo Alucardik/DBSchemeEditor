@@ -44,6 +44,8 @@ export abstract class BaseEntity {
         this.name = name
     }
 
+    abstract AddAttribute(this: BaseEntity, attributeName: string, ...extraArgs: any[]): void
+
     abstract GetPosition(this: BaseEntity): Point
 
     abstract SetPosition(this: BaseEntity, x: number, y: number): void

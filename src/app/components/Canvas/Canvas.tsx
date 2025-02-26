@@ -1,20 +1,23 @@
 "use client"
 
+import useMousePosition from "@/app/hooks/use_mouse_position"
+import { editedEntityStore, notationStore } from "@/app/stores"
+import { BaseEntity } from "@/libs/erd/base_entity"
+import { CrowsFootNotation } from "@/libs/notations/crows_foot"
+import { Cursor } from "@/libs/render/cursor"
+import { Point } from "@/libs/render/shapes"
+import { Key } from "@/libs/utils/keys_enums"
+import type { Optional } from "@/libs/utils/types"
 import { KeyboardEvent, MouseEvent, RefObject, useEffect, useRef } from "react"
 
 import styles from "./Canvas.module.scss"
-import { BaseEntity } from "@/libs/erd/base_entity"
-import { CrowsFootNotation } from "@/libs/notations/crows_foot"
-import { Point } from "@/libs/render/shapes"
-import useMousePosition from "@/app/hooks/use_mouse_position"
-import { Cursor } from "@/libs/render/cursor"
-import type { Optional } from "@/libs/utils/types"
-import { Key } from "@/libs/utils/keys_enums"
 
 
-const controlKeys = new Set(["Shift", "Control", "Alt", "Meta", "ArrowUp", "ArrowDown"])
+const controlKeys = new Set([Key.Shift, Key.Control, Key.Alt, Key.Meta, Key.ArrowUp, Key.ArrowDown])
 
 export default function Canvas() {
+    console.log("render canvas")
+
     // consts
     const doubleClickDurationMS = 400
 
@@ -23,11 +26,11 @@ export default function Canvas() {
     const canvasRef: RefObject<Optional<HTMLCanvasElement>> = useRef(null)
     const canvasCtxRef: RefObject<Optional<CanvasRenderingContext2D>> = useRef(null)
 
+    let currentNotation = CrowsFootNotation.GetNotationName()
+
     // state variables
     // TODO: save entities and current notation to local storage and upload from there on startup
     const entities = new Array<BaseEntity>()
-    let currentNotation = CrowsFootNotation.GetNotationName()
-
     const cursor = new Cursor()
 
     let inEditMode = false
@@ -78,10 +81,11 @@ export default function Canvas() {
     }
 
     useEffect(() => {
-        (canvasCtxRef.current as unknown as CanvasRenderingContext2D) = getCanvas().getContext("2d") as CanvasRenderingContext2D
-
+        canvasCtxRef.current = getCanvas().getContext("2d") as CanvasRenderingContext2D
         resizeCanvasToScreen()
+
         window.addEventListener("resize", resizeCanvasToScreen)
+        notationStore.Set({notation: currentNotation})
 
         return () => {
             window.removeEventListener("resize", resizeCanvasToScreen)
@@ -161,6 +165,7 @@ export default function Canvas() {
             return
         }
 
+        // @ts-ignore
         if (controlKeys.has(e.key)) {
             return
         }
@@ -183,6 +188,7 @@ export default function Canvas() {
             case Key.Escape:
             case Key.Enter:
                 inEditMode = false
+                editedEntityStore.Set({entity: null})
                 return
             default:
                 metaAPressed = cursor.HandleKeyInput(e)
@@ -200,7 +206,7 @@ export default function Canvas() {
         animate(() => {
             editedEntity.Clear(canvasCtx)
             editedEntity.Render(canvasCtx)
-            
+
             if (metaAPressed) {
                 editedEntity.SelectPart(selectedPart.name, canvasCtx)
             }
@@ -231,7 +237,9 @@ export default function Canvas() {
             return
         }
 
+
         inEditMode = true
+        editedEntityStore.Set({ entity: entities[editedEntityIndex] })
 
         const canvasCtx = getCanvasCtx()
 
@@ -249,6 +257,7 @@ export default function Canvas() {
 
         if (inEditMode) {
             inEditMode = false
+            editedEntityStore.Set({ entity: null })
             // remove highlight on edit mode exit
             animate(renderEntities)
 

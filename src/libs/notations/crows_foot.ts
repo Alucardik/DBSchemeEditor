@@ -8,6 +8,20 @@ export namespace CrowsFootNotation {
         return "CrowsFoot"
     }
 
+    class EntityAttribute extends EntityPart<Rectangle> {
+        private primaryKey: boolean = false
+        private foreignKey: boolean = false
+
+        constructor(name: string, rectangle: Rectangle, text: string = "") {
+            super(name, rectangle, text)
+        }
+
+        SetAsPrimaryKey(this: EntityAttribute) {
+            this.primaryKey = true
+            this.foreignKey = false
+        }
+    }
+
     export class Entity extends BaseEntity {
         private readonly minWidth = 100
         private readonly minAttributesHeight = 50
@@ -15,6 +29,8 @@ export namespace CrowsFootNotation {
 
         private readonly header:  EntityPart<Rectangle>
         private readonly attributesContainer: EntityPart<Rectangle>
+        private attributes: EntityAttribute[]
+
         private selectedPartName: Optional<string>
         // TODO: save styles, related to each entity rather than context
 
@@ -23,6 +39,7 @@ export namespace CrowsFootNotation {
 
             this.header = new EntityPart("header", new Rectangle(x, y, this.minWidth, this.headerHeight))
             this.attributesContainer = new EntityPart("attributes", new Rectangle(x, y + this.headerHeight, this.minWidth, this.minAttributesHeight))
+            this.attributes = []
             this.selectedPartName = null
 
             this.header.SetText(this.name)
@@ -71,6 +88,22 @@ export namespace CrowsFootNotation {
         override SetName(this: Entity, name: string) {
             super.SetName(name)
             this.header.SetText(name)
+        }
+
+        AddAttribute(this: Entity, attributeName: string, ...extraArgs: [string]) {
+            const [attributeType] = extraArgs
+
+            // TODO: don't hardcode height
+            this.attributes.push(new EntityAttribute(
+                "attribute" + this.attributes.length.toString(),
+                new Rectangle(
+                    this.attributesContainer.shape.topLeftCorner.x,
+                    this.attributesContainer.shape.topLeftCorner.y,
+                    this.attributesContainer.shape.width,
+                    20
+                ),
+                attributeName,
+            ))
         }
 
         GetPosition(): Point {
