@@ -9,7 +9,6 @@ export class Store<T> {
         this.eventName = eventName
     }
 
-    // Get current value
     Get() {
         return this.value
     }

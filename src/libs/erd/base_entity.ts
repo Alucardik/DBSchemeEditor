@@ -1,6 +1,8 @@
 import { Point, Shape } from "@/libs/render/shapes"
 import type { Optional } from "@/libs/utils/types"
 
+export type TextPositionGetter<S extends Shape> = (s: S) => [Point, boolean]
+
 export class EntityPart<S extends Shape> {
     readonly name: string
     readonly shape: S
@@ -8,10 +10,16 @@ export class EntityPart<S extends Shape> {
     private text: string
     // TODO: maybe save styles here instead of the whole entity
 
-    constructor(name: string, shape: S, text: string = "") {
+    constructor(
+        name: string,
+        shape: S,
+        text: string = "",
+        textPositionGetter: TextPositionGetter<S> = (s: S) => [s.GetPivotPoint(), false],
+    ) {
         this.name = name
         this.shape = shape
         this.text = text
+        this.GetTextPosition = (): [Point, boolean] => textPositionGetter(this.shape)
     }
 
     GetText(this: EntityPart<S>): string {
@@ -20,6 +28,13 @@ export class EntityPart<S extends Shape> {
 
     SetText(this: EntityPart<S>, text: string) {
         this.text = text
+    }
+
+
+    // GetTextPosition returns text position relative to this EnityPart's shape;
+    // the second parameter tells whether the text is centered or not (may be overriden in the constructor)
+    GetTextPosition = (): [Point, boolean] => {
+        return [this.shape.GetPivotPoint(), false]
     }
 }
 
@@ -40,29 +55,27 @@ export abstract class BaseEntity {
         return this.name
     }
 
-    SetName(this: BaseEntity, name: string){
+    SetName(name: string){
         this.name = name
     }
 
-    abstract AddAttribute(this: BaseEntity, attributeName: string, ...extraArgs: any[]): void
+    abstract AddAttribute(attributeName: string, ...extraArgs: any[]): void
 
-    abstract GetPosition(this: BaseEntity): Point
+    abstract GetPosition(): Point
 
-    abstract SetPosition(this: BaseEntity, x: number, y: number): void
+    abstract SetPosition(x: number, y: number): void
 
-    abstract GetInteractedPart(this: BaseEntity, p: Point): Optional<EntityPart<Shape>>
+    abstract GetInteractedPart(p: Point): Optional<EntityPart<Shape>>
 
-    abstract SelectPart(this: BaseEntity, partName: string, ctx: CanvasRenderingContext2D): void
+    abstract SelectPart(partName: string, ctx: CanvasRenderingContext2D): void
 
-    abstract GetSelectedPart(this: BaseEntity): Optional<EntityPart<Shape>>
+    abstract GetSelectedPart(): Optional<EntityPart<Shape>>
 
-    abstract GetSelectedPartTextPosition(this: BaseEntity): Optional<Point>
+    abstract GetWidth(): number
 
-    abstract GetWidth(this: BaseEntity): number
+    abstract GetHeight(): number
 
-    abstract GetHeight(this: BaseEntity): number
+    abstract Render(ctx: CanvasRenderingContext2D): void
 
-    abstract Render(this: BaseEntity, ctx: CanvasRenderingContext2D): void
-
-    abstract Clear(this: BaseEntity, ctx: CanvasRenderingContext2D): void
+    abstract Clear(ctx: CanvasRenderingContext2D): void
 }

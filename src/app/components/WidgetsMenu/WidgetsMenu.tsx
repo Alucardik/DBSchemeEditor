@@ -1,3 +1,4 @@
+import { canvasUpdateEvent } from "@/app/events"
 import useStore from "@/app/hooks/use_store"
 import { editedEntityStore, notationStore } from "@/app/stores"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
@@ -19,8 +20,9 @@ export default function WidgetsMenu() {
 
         return (
             <div className={styles["widgets-menu"]} style={{left: entityPos.x, top: entityPos.y}}>
-                <button onClick={() => {
+                <button className={styles["widgets-menu__button"]} onClick={() => {
                     crowsFootEntity.AddAttribute("New Attribute", "string")
+                    canvasUpdateEvent.Dispatch(null)
                 }}>
                     Add Attribute
                 </button>

@@ -1,5 +1,6 @@
 "use client"
 
+import { canvasUpdateEvent } from "@/app/events"
 import useMousePosition from "@/app/hooks/use_mouse_position"
 import { editedEntityStore, notationStore } from "@/app/stores"
 import { BaseEntity } from "@/libs/erd/base_entity"
@@ -37,6 +38,7 @@ export default function Canvas() {
 
     let draggedEntityOffset: Optional<Point> = null
     let draggedEntityIndex = -1
+    // TODO: maybe replace with optional entity
     let editedEntityIndex = -1
 
     let lastFrameID = 0
@@ -80,19 +82,6 @@ export default function Canvas() {
         // }
     }
 
-    useEffect(() => {
-        canvasCtxRef.current = getCanvas().getContext("2d") as CanvasRenderingContext2D
-        resizeCanvasToScreen()
-
-        window.addEventListener("resize", resizeCanvasToScreen)
-        notationStore.Set({notation: currentNotation})
-
-        return () => {
-            window.removeEventListener("resize", resizeCanvasToScreen)
-            cancelAnimationFrame(lastFrameID)
-        }
-    }, [])
-
     const animate = (animationCallback: () => void) => {
         lastFrameID = requestAnimationFrame(animationCallback)
     }
@@ -105,6 +94,27 @@ export default function Canvas() {
             entities[i].Render(canvasCtx)
         }
     }
+
+    useEffect(() => {
+        canvasCtxRef.current = getCanvas().getContext("2d") as CanvasRenderingContext2D
+        resizeCanvasToScreen()
+
+        const animateEntities = () => {
+            animate(renderEntities)
+        }
+
+        window.addEventListener("resize", resizeCanvasToScreen)
+        notationStore.Set({notation: currentNotation})
+        canvasUpdateEvent.AddListener(animateEntities)
+
+        return () => {
+            window.removeEventListener("resize", resizeCanvasToScreen)
+            canvasUpdateEvent.RemoveListener(animateEntities)
+            cancelAnimationFrame(lastFrameID)
+        }
+    }, [])
+
+
 
     const getEntityBeingEdited =  (e: MouseEvent<HTMLCanvasElement>) => {
         return entities.findIndex((entity: BaseEntity) =>
@@ -195,10 +205,11 @@ export default function Canvas() {
         }
 
         const canvasCtx = getCanvasCtx()
-        const selectedPartTextPosition = editedEntity.GetSelectedPartTextPosition()
+        const [selectedPartTextPosition, isCentered] = selectedPart.GetTextPosition()
 
+        console.log(isCentered, selectedPart.name)
         if (selectedPartTextPosition) {
-            cursor.UpdatePosition(selectedPartTextPosition, canvasCtx)
+            cursor.UpdatePosition(selectedPartTextPosition, canvasCtx, isCentered)
         }
 
         selectedPart.SetText(cursor.GetEditedString())
@@ -237,7 +248,6 @@ export default function Canvas() {
             return
         }
 
-
         inEditMode = true
         editedEntityStore.Set({ entity: entities[editedEntityIndex] })
 
@@ -255,6 +265,7 @@ export default function Canvas() {
         const isDoubleClick = e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS
         lastMouseDownTimestamp = e.timeStamp
 
+        // TODO: check for collision with entity before exiting edit mode
         if (inEditMode) {
             inEditMode = false
             editedEntityStore.Set({ entity: null })
@@ -268,6 +279,8 @@ export default function Canvas() {
             handleEditOnDoubleClick(e)
             return
         }
+
+        // TODO: detect single click to enter edit mode
 
         draggedEntityIndex = getEntityBeingEdited(e)
         if (draggedEntityIndex === -1) {

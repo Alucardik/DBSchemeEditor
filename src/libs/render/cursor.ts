@@ -1,7 +1,7 @@
-import { Point } from "@/libs/render/shapes"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
-import { Key } from "../utils/keys_enums"
+import { Point } from "@/libs/render/shapes"
 import type { KeyboardEvent } from "react"
+import { Key } from "../utils/keys_enums"
 
 export class Cursor {
     private readonly updateDurationMS = 500
@@ -91,13 +91,17 @@ export class Cursor {
         return Date.now() - this.updateTimestampMS >= this.updateDurationMS && !this.wholeTextSelected
     }
 
-    UpdatePosition(this: Cursor, textPosition: Point, ctx: CanvasRenderingContext2D) {
+    UpdatePosition(this: Cursor, textPosition: Point, ctx: CanvasRenderingContext2D, isTextCentered: boolean = false) {
         const wholeTextInfo = ctx.measureText(this.editedString)
         const offsetTextInfo = ctx.measureText(this.editedString.slice(this.letterIndex))
 
         // TODO: parse font height
-        this.position.x = textPosition.x + wholeTextInfo.width / 2 - offsetTextInfo.width
+        this.position.x = textPosition.x - offsetTextInfo.width
         this.position.y = textPosition.y - 8
+
+        isTextCentered ?
+            this.position.x += wholeTextInfo.width / 2 :
+            this.position.x += wholeTextInfo.width
     }
 
     Render(this: Cursor, ctx: CanvasRenderingContext2D, forceVisible: boolean = false) {
@@ -109,6 +113,7 @@ export class Cursor {
         }
 
         this.visible ? ctx.fillStyle = "black" : ctx.fillStyle = "transparent"
+        // TODO: parse font height
         ctx.fillRect(this.position.x, this.position.y, 1, 10)
         resetCanvasContextProps(ctx)
     }
