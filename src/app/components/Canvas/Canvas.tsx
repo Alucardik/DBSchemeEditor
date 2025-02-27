@@ -4,6 +4,7 @@ import { canvasUpdateEvent } from "@/app/events"
 import useMousePosition from "@/app/hooks/use_mouse_position"
 import { canvasOffsetStore, editedEntityStore, notationStore } from "@/app/stores"
 import { BaseEntity } from "@/libs/erd/base_entity"
+import { BaseRelationship } from "@/libs/erd/base_relationship"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
 import { Cursor } from "@/libs/render/cursor"
 import { Point } from "@/libs/render/shapes"
@@ -31,7 +32,8 @@ export default function Canvas() {
 
     // state variables
     // TODO: save entities and current notation to local storage and upload from there on startup
-    const entities = new Array<BaseEntity>()
+    const entities = [] as BaseEntity[]
+    const relatioships = [] as BaseRelationship[]
     const canvasOffset = new Point(0, 0)
     const cursor = new Cursor()
 
@@ -82,19 +84,23 @@ export default function Canvas() {
         canvas.style.width =  document.body.clientWidth + "px"
         canvas.style.height = document.body.clientHeight + "px"
         canvasCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
-        animate(renderEntities)
+        animate(renderERD)
     }
 
     const animate = (animationCallback: () => void) => {
         lastFrameID = requestAnimationFrame(animationCallback)
     }
 
-    const renderEntities = () => {
+    const renderERD = () => {
         const canvasCtx = getCanvasCtx()
         canvasCtx.clearRect(canvasOffset.x, canvasOffset.y, canvasCtx.canvas.width, canvasCtx.canvas.height)
 
         for (let i = 0; i < entities.length; ++i) {
             entities[i].Render(canvasCtx)
+        }
+
+        for (let i = 0; i < relatioships.length; ++i) {
+            relatioships[i].Render(canvasCtx)
         }
     }
 
@@ -103,7 +109,7 @@ export default function Canvas() {
         resizeCanvasToScreen()
 
         const animateEntities = () => {
-            animate(renderEntities)
+            animate(renderERD)
         }
 
         window.addEventListener("resize", resizeCanvasToScreen)
@@ -119,6 +125,7 @@ export default function Canvas() {
 
 
 
+    // TODO: change to find instead of find index
     const getEntityBeingEdited =  (e: MouseEvent<HTMLCanvasElement>) => {
         return entities.findIndex((entity: BaseEntity) =>
             entity.GetInteractedPart(canvasOffset.Translate(e.clientX, e.clientY))
@@ -168,7 +175,7 @@ export default function Canvas() {
         }
 
         entities[draggedEntityIndex].SetPosition(mouseX - draggedEntityOffset.x, mouseY - draggedEntityOffset.y)
-        renderEntities()
+        renderERD()
 
         animate(updateEntityPositionOnDrag)
     }
@@ -201,6 +208,7 @@ export default function Canvas() {
             case Key.Escape:
             case Key.Enter:
                 inEditMode = false
+                editedEntity.Unselect()
                 editedEntityStore.Set({entity: null})
                 return
             default:
@@ -232,7 +240,8 @@ export default function Canvas() {
         const newEntity = new CrowsFootNotation.Entity("random", 0, 0)
         newEntity.SetPosition(canvasOffset.x + e.clientX - newEntity.GetWidth() / 2, canvasOffset.y + e.clientY - newEntity.GetHeight() / 2)
         entities.push(newEntity)
-        animate(renderEntities)
+
+        animate(renderERD)
     }
 
     const handleEditOnDoubleClick = (e: MouseEvent<HTMLCanvasElement>) => {
@@ -251,8 +260,6 @@ export default function Canvas() {
         }
 
         inEditMode = true
-        editedEntityStore.Set({ entity: entities[editedEntityIndex] })
-
         const canvasCtx = getCanvasCtx()
 
         const interactedPart = entities[editedEntityIndex].GetInteractedPart(canvasOffset.Translate(e.clientX, e.clientY))
@@ -261,18 +268,23 @@ export default function Canvas() {
                 entities[editedEntityIndex].SelectPart(interactedPart.name, canvasCtx)
             })
         }
+
+        editedEntityStore.Set({entity: entities[editedEntityIndex]})
     }
 
     const dragEntityOnMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
         const isDoubleClick = e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS
         lastMouseDownTimestamp = e.timeStamp
 
-        // TODO: check for collision with entity before exiting edit mode
-        if (inEditMode) {
+        const editedEntityIndex = getEntityBeingEdited(e)
+
+        // TODO: move entering | exiting edit mode to a separate function
+        if (inEditMode && editedEntityIndex === -1) {
             inEditMode = false
             editedEntityStore.Set({ entity: null })
+
             // remove highlight on edit mode exit
-            animate(renderEntities)
+            animate(renderERD)
 
             return
         }
@@ -284,7 +296,7 @@ export default function Canvas() {
 
         // TODO: detect single click to enter edit mode
 
-        draggedEntityIndex = getEntityBeingEdited(e)
+        draggedEntityIndex = editedEntityIndex
         if (draggedEntityIndex === -1) {
             addEntityOnClick(e)
             return
@@ -310,7 +322,7 @@ export default function Canvas() {
         canvasOffset.y += e.deltaY
 
         canvasOffsetStore.Set(canvasOffset.Translate(0, 0))
-        animate(renderEntities)
+        animate(renderERD)
     }
 
     return (

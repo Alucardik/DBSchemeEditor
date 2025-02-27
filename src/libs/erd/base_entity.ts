@@ -71,6 +71,8 @@ export abstract class BaseEntity {
 
     abstract GetSelectedPart(): Optional<EntityPart<Shape>>
 
+    abstract Unselect(): void
+
     abstract GetWidth(): number
 
     abstract GetHeight(): number

@@ -7,7 +7,7 @@ import styles from './WidgetsMenu.module.scss'
 
 export default function WidgetsMenu() {
     const { notation } = useStore(notationStore)
-    const { entity } = useStore(editedEntityStore)
+    const { entity, selectedPartName } = useStore(editedEntityStore)
     const canvasOffset = useStore(canvasOffsetStore)
 
     if (!entity) {
@@ -18,6 +18,8 @@ export default function WidgetsMenu() {
 
     if (notation === CrowsFootNotation.GetNotationName()) {
         const crowsFootEntity = entity as CrowsFootNotation.Entity
+        const selectedAttr = crowsFootEntity.GetSelectedAttribute()
+        const modifierButtonDisplayStyle = selectedAttr ? "block" : "none"
 
         return (
             <div className={styles["widgets-menu"]} style={{left: entityPos.x - canvasOffset.x, top: entityPos.y - canvasOffset.y}}>
@@ -26,6 +28,18 @@ export default function WidgetsMenu() {
                     canvasUpdateEvent.Dispatch(null)
                 }}>
                     Add Attribute
+                </button>
+                <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
+                    selectedAttr?.SetAsPrimaryKey()
+                    canvasUpdateEvent.Dispatch(null)
+                }}>
+                    Set as PK
+                </button>
+                <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
+                    selectedAttr?.SetAsForeignKey()
+                    canvasUpdateEvent.Dispatch(null)
+                }}>
+                    Set as FK
                 </button>
             </div>
         )

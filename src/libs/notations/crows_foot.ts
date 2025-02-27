@@ -16,24 +16,39 @@ export namespace CrowsFootNotation {
             super(name, rectangle, text, (r: Rectangle) => [r.GetPivotPoint().Translate(r.width / 10, r.height / 2), false])
         }
 
+        IsPrimaryKey(this: EntityAttribute): boolean {
+            return this.primaryKey
+        }
+
         SetAsPrimaryKey(this: EntityAttribute) {
             this.primaryKey = true
             this.foreignKey = false
+        }
+
+        IsForeignKey(this: EntityAttribute): boolean {
+            return this.foreignKey
+        }
+
+        SetAsForeignKey(this: EntityAttribute) {
+            this.foreignKey = true
+            this.primaryKey = false
         }
     }
 
     export class Entity extends BaseEntity {
         private readonly minWidth = 100
         private readonly minAttributesHeight = 65
-        private readonly firstAttributeOffset = 5
         private readonly attributeHeight  = 20
+        private readonly firstAttributeOffset = 5
+        private readonly attributeModifierOffset = 15
+        private readonly attributeRelationConnectorRadius = 3
         private readonly headerHeight = 30
 
         private readonly header:  EntityPart<Rectangle>
         private readonly attributesContainer: EntityPart<Rectangle>
         private attributes: EntityAttribute[]
+        private selectedPart: Optional<EntityPart<Rectangle>>
 
-        private selectedPartName: Optional<string>
         // TODO: save styles, related to each entity rather than context
 
         constructor(name: string, x: number = 0, y: number = 0) {
@@ -53,7 +68,7 @@ export namespace CrowsFootNotation {
                 new Rectangle(x, y + this.headerHeight, this.minWidth, this.minAttributesHeight),
             )
             this.attributes = []
-            this.selectedPartName = null
+            this.selectedPart = null
         }
 
         private RenderHeader(this: Entity, ctx: CanvasRenderingContext2D) {
@@ -78,7 +93,48 @@ export namespace CrowsFootNotation {
 
             for (const attribute of this.attributes) {
                 const [attrTextPos] = attribute.GetTextPosition()
+                let supportsRelationships = false
+
                 ctx.fillText(attribute.GetText(), attrTextPos.x, attrTextPos.y, this.GetWidth())
+
+                if (attribute.IsPrimaryKey()) {
+                    supportsRelationships = true
+                    const pkTextInfo = ctx.measureText("PK")
+                    ctx.fillText("PK", attrTextPos.x + this.GetWidth() - pkTextInfo.width - this.attributeModifierOffset, attrTextPos.y)
+                }
+
+                if (attribute.IsForeignKey()) {
+                    supportsRelationships = true
+                    const fkTextInfo = ctx.measureText("FK")
+                    ctx.fillText("FK", attrTextPos.x + this.GetWidth() - fkTextInfo.width - this.attributeModifierOffset, attrTextPos.y)
+                }
+
+                if (supportsRelationships) {
+                    ctx.fillStyle = "blue"
+                    ctx.beginPath()
+                    ctx.arc(
+                        this.attributesContainer.shape.topLeftCorner.x,
+                        attrTextPos.y,
+                        this.attributeRelationConnectorRadius,
+                        0,
+                        Math.PI * 2,
+                    )
+                    ctx.fill()
+                    ctx.stroke()
+
+                    ctx.beginPath()
+                    ctx.arc(
+                        this.attributesContainer.shape.topLeftCorner.x + this.GetWidth(),
+                        attrTextPos.y,
+                        this.attributeRelationConnectorRadius,
+                        0,
+                        Math.PI * 2,
+                    )
+                    ctx.fill()
+                    ctx.stroke()
+
+                    ctx.fillStyle = "black"
+                }
             }
 
             resetCanvasContextProps(ctx)
@@ -142,6 +198,7 @@ export namespace CrowsFootNotation {
             if (partName === this.header.name) {
                 [partTextPos] = this.header.GetTextPosition()
                 text = this.header.GetText()
+                this.selectedPart = this.header
             }
 
             // TODO: maybe store attributes name -> index mapping separately
@@ -150,15 +207,15 @@ export namespace CrowsFootNotation {
                 if (attr) {
                     [partTextPos] = attr.GetTextPosition()
                     text = attr.GetText()
+                    this.selectedPart = attr
                 }
             }
 
             if (!partTextPos) {
-                this.selectedPartName = null
+                this.selectedPart = null
                 return
             }
 
-            this.selectedPartName = partName
             // remove highlighting from the other parts of the entity
             this.Render(ctx)
 
@@ -181,18 +238,21 @@ export namespace CrowsFootNotation {
             resetCanvasContextProps(ctx)
         }
 
-        // TODO: maybe save selected part reference instead of name
-        GetSelectedPart(this: Entity): Optional<EntityPart<Rectangle>> {
-            if (this.selectedPartName === this.header.name) {
-                return this.header
-            }
-
-            const attr = this.attributes.find((attr) => attr.name === this.selectedPartName)
-            if (attr) {
-                return attr
+        GetSelectedAttribute(this: Entity): Optional<EntityAttribute> {
+            if (this.selectedPart instanceof EntityAttribute) {
+                return this.selectedPart
             }
 
             return null
+        }
+
+        // TODO: maybe save selected part reference instead of name
+        GetSelectedPart(this: Entity): Optional<EntityPart<Rectangle>> {
+            return this.selectedPart
+        }
+
+        Unselect(this: Entity): void {
+            this.selectedPart = null
         }
 
         GetWidth(this: Entity): number {
