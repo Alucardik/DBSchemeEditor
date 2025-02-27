@@ -2,14 +2,14 @@
 
 import { canvasUpdateEvent } from "@/app/events"
 import useMousePosition from "@/app/hooks/use_mouse_position"
-import { editedEntityStore, notationStore } from "@/app/stores"
+import { canvasOffsetStore, editedEntityStore, notationStore } from "@/app/stores"
 import { BaseEntity } from "@/libs/erd/base_entity"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
 import { Cursor } from "@/libs/render/cursor"
 import { Point } from "@/libs/render/shapes"
 import { Key } from "@/libs/utils/keys_enums"
 import type { Optional } from "@/libs/utils/types"
-import { KeyboardEvent, MouseEvent, RefObject, useEffect, useRef } from "react"
+import { KeyboardEvent, MouseEvent, RefObject, useEffect, useRef, WheelEvent } from "react"
 
 import styles from "./Canvas.module.scss"
 
@@ -32,6 +32,7 @@ export default function Canvas() {
     // state variables
     // TODO: save entities and current notation to local storage and upload from there on startup
     const entities = new Array<BaseEntity>()
+    const canvasOffset = new Point(0, 0)
     const cursor = new Cursor()
 
     let inEditMode = false
@@ -54,11 +55,16 @@ export default function Canvas() {
 
     const getPixelRatio = () => {
         const canvasCtx = getCanvasCtx()
-        const dpr = window.devicePixelRatio || 1,
-            bsr = canvasCtx.webkitBackingStorePixelRatio ||
+        const dpr = window.devicePixelRatio || 1
+        // @ts-ignore
+        const bsr = canvasCtx.webkitBackingStorePixelRatio ||
+                // @ts-ignore
                 canvasCtx.mozBackingStorePixelRatio ||
+                // @ts-ignore
                 canvasCtx.msBackingStorePixelRatio ||
+                // @ts-ignore
                 canvasCtx.oBackingStorePixelRatio ||
+                // @ts-ignore
                 canvasCtx.backingStorePixelRatio || 1
 
 
@@ -66,7 +72,7 @@ export default function Canvas() {
     }
 
     const resizeCanvasToScreen = () => {
-        // FIXME: do not break on zoom
+        // FIXME: correctly clear the canvas while zoomed | unzoomed
         const pixelRatio = getPixelRatio()
         const canvas = getCanvas()
         const canvasCtx = getCanvasCtx()
@@ -76,10 +82,7 @@ export default function Canvas() {
         canvas.style.width =  document.body.clientWidth + "px"
         canvas.style.height = document.body.clientHeight + "px"
         canvasCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
-
-        // if (canvasCtx && (canvasRef.height > CANVAS_SZ_LIMS.y || canvasRef.width > CANVAS_SZ_LIMS.x)) {
-        //   canvasCtx.scale(canvasRef.width / CANVAS_SZ_LIMS.x, canvasRef.height / CANVAS_SZ_LIMS.y);
-        // }
+        animate(renderEntities)
     }
 
     const animate = (animationCallback: () => void) => {
@@ -88,7 +91,7 @@ export default function Canvas() {
 
     const renderEntities = () => {
         const canvasCtx = getCanvasCtx()
-        canvasCtx.clearRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height)
+        canvasCtx.clearRect(canvasOffset.x, canvasOffset.y, canvasCtx.canvas.width, canvasCtx.canvas.height)
 
         for (let i = 0; i < entities.length; ++i) {
             entities[i].Render(canvasCtx)
@@ -118,7 +121,7 @@ export default function Canvas() {
 
     const getEntityBeingEdited =  (e: MouseEvent<HTMLCanvasElement>) => {
         return entities.findIndex((entity: BaseEntity) =>
-            entity.GetInteractedPart(new Point(e.clientX, e.clientY))
+            entity.GetInteractedPart(canvasOffset.Translate(e.clientX, e.clientY))
         )
     }
 
@@ -207,7 +210,6 @@ export default function Canvas() {
         const canvasCtx = getCanvasCtx()
         const [selectedPartTextPosition, isCentered] = selectedPart.GetTextPosition()
 
-        console.log(isCentered, selectedPart.name)
         if (selectedPartTextPosition) {
             cursor.UpdatePosition(selectedPartTextPosition, canvasCtx, isCentered)
         }
@@ -228,7 +230,7 @@ export default function Canvas() {
 
     const addEntityOnClick = (e: MouseEvent<HTMLCanvasElement>) => {
         const newEntity = new CrowsFootNotation.Entity("random", 0, 0)
-        newEntity.SetPosition(e.clientX - newEntity.GetWidth() / 2, e.clientY - newEntity.GetHeight() / 2)
+        newEntity.SetPosition(canvasOffset.x + e.clientX - newEntity.GetWidth() / 2, canvasOffset.y + e.clientY - newEntity.GetHeight() / 2)
         entities.push(newEntity)
         animate(renderEntities)
     }
@@ -253,7 +255,7 @@ export default function Canvas() {
 
         const canvasCtx = getCanvasCtx()
 
-        const interactedPart = entities[editedEntityIndex].GetInteractedPart(new Point(e.clientX, e.clientY))
+        const interactedPart = entities[editedEntityIndex].GetInteractedPart(canvasOffset.Translate(e.clientX, e.clientY))
         if (interactedPart) {
             animate(() => {
                 entities[editedEntityIndex].SelectPart(interactedPart.name, canvasCtx)
@@ -301,6 +303,16 @@ export default function Canvas() {
         cancelAnimationFrame(lastFrameID)
     }
 
+    const moveCanvasOnWheel = (e: WheelEvent<HTMLCanvasElement>) => {
+        const canvasCtx = getCanvasCtx()
+        canvasCtx.translate(-e.deltaX, -e.deltaY)
+        canvasOffset.x += e.deltaX
+        canvasOffset.y += e.deltaY
+
+        canvasOffsetStore.Set(canvasOffset.Translate(0, 0))
+        animate(renderEntities)
+    }
+
     return (
         <canvas
             // tabIndex enables keys events
@@ -308,6 +320,7 @@ export default function Canvas() {
             onMouseDown={dragEntityOnMouseDown}
             onMouseUp={dropEntityOnMouseUp}
             onKeyDown={updateEntityPartOnKeyPress}
+            onWheel={moveCanvasOnWheel}
             className={styles.canvas}
             ref={canvasRef}
         >
