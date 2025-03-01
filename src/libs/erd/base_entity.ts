@@ -38,6 +38,8 @@ export class EntityPart<S extends Shape> {
     }
 }
 
+export class BaseEntityAttribute<S extends Shape> extends EntityPart<S> {}
+
 export abstract class BaseEntity {
     private static counter: number = 0
 

@@ -7,7 +7,7 @@ import styles from './WidgetsMenu.module.scss'
 
 export default function WidgetsMenu() {
     const { notation } = useStore(notationStore)
-    const { entity, selectedPartName } = useStore(editedEntityStore)
+    const { entity } = useStore(editedEntityStore)
     const canvasOffset = useStore(canvasOffsetStore)
 
     if (!entity) {
@@ -40,6 +40,12 @@ export default function WidgetsMenu() {
                     canvasUpdateEvent.Dispatch(null)
                 }}>
                     Set as FK
+                </button>
+                <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
+                    selectedAttr?.RemoveModifiers()
+                    canvasUpdateEvent.Dispatch(null)
+                }}>
+                    Remove Modifiers
                 </button>
             </div>
         )

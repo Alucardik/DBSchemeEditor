@@ -17,6 +17,10 @@ class Point {
     Translate(this: Point, xOffset: number, yOffset: number) {
         return new Point(this.x + xOffset, this.y + yOffset)
     }
+
+    Expand(this: Point): [number, number] {
+        return [this.x, this.y]
+    }
 }
 
 interface Shape {

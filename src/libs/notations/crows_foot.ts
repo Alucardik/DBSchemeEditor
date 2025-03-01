@@ -1,6 +1,7 @@
-import { BaseEntity, EntityPart } from "@/libs/erd/base_entity"
+import { BaseEntity, BaseEntityAttribute, EntityPart } from "@/libs/erd/base_entity"
+import { BaseRelationship } from "@/libs/erd/base_relationship"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
-import { Point, Rectangle } from "@/libs/render/shapes"
+import { Ellipse, Point, Rectangle } from "@/libs/render/shapes"
 import type { Optional } from "@/libs/utils/types"
 
 export namespace CrowsFootNotation {
@@ -8,30 +9,85 @@ export namespace CrowsFootNotation {
         return "CrowsFoot"
     }
 
-    class EntityAttribute extends EntityPart<Rectangle> {
+    class EntityAttribute extends BaseEntityAttribute<Rectangle> {
+        private readonly relationConnectorRadius: number = 3
+        private readonly modifierOffset = 15
+        private relationConnectors: [Ellipse, Ellipse]
         private primaryKey: boolean = false
         private foreignKey: boolean = false
 
         constructor(name: string, rectangle: Rectangle, text: string = "") {
             super(name, rectangle, text, (r: Rectangle) => [r.GetPivotPoint().Translate(r.width / 10, r.height / 2), false])
+            this.relationConnectors = [
+                new Ellipse(new Point(-1, -1), this.relationConnectorRadius, this.relationConnectorRadius),
+                new Ellipse(new Point(-1, -1), this.relationConnectorRadius, this.relationConnectorRadius),
+            ]
+        }
+
+        SetAsPrimaryKey(this: EntityAttribute) {
+            this.primaryKey = true
+            this.foreignKey = false
+
         }
 
         IsPrimaryKey(this: EntityAttribute): boolean {
             return this.primaryKey
         }
 
-        SetAsPrimaryKey(this: EntityAttribute) {
-            this.primaryKey = true
-            this.foreignKey = false
+        SetAsForeignKey(this: EntityAttribute) {
+            this.foreignKey = true
+            this.primaryKey = false
         }
 
         IsForeignKey(this: EntityAttribute): boolean {
             return this.foreignKey
         }
 
-        SetAsForeignKey(this: EntityAttribute) {
-            this.foreignKey = true
+        RemoveModifiers(this: EntityAttribute) {
             this.primaryKey = false
+            this.foreignKey = false
+        }
+
+        SetPosition(this: EntityAttribute, x: number, y: number) {
+            this.shape.topLeftCorner.x = x
+            this.shape.topLeftCorner.y = y
+            const [textPos] = this.GetTextPosition()
+
+            for (const connector of this.relationConnectors) {
+                connector.center.x = x
+                connector.center.y = textPos.y
+            }
+
+            this.relationConnectors[1].center.x += this.shape.width
+        }
+
+        Render(this: EntityAttribute, ctx: CanvasRenderingContext2D) {
+            const [attrTextPos] = this.GetTextPosition()
+            let supportsRelationships = this.primaryKey || this.foreignKey
+
+            ctx.fillStyle = "black"
+            ctx.textAlign = "left"
+
+            ctx.fillText(this.GetText(), attrTextPos.x, attrTextPos.y, this.shape.width)
+
+            if (this.primaryKey) {
+                const pkTextInfo = ctx.measureText("PK")
+                ctx.fillText("PK", attrTextPos.x + this.shape.width - pkTextInfo.width - this.modifierOffset, attrTextPos.y)
+            }
+
+            if (this.foreignKey) {
+                const fkTextInfo = ctx.measureText("FK")
+                ctx.fillText("FK", attrTextPos.x + this.shape.width - fkTextInfo.width - this.modifierOffset, attrTextPos.y)
+            }
+
+            if (supportsRelationships) {
+                ctx.fillStyle = "blue"
+                for (const connector of this.relationConnectors) {
+                    connector.Render(ctx, true)
+                }
+            }
+
+            resetCanvasContextProps(ctx)
         }
     }
 
@@ -40,14 +96,12 @@ export namespace CrowsFootNotation {
         private readonly minAttributesHeight = 65
         private readonly attributeHeight  = 20
         private readonly firstAttributeOffset = 5
-        private readonly attributeModifierOffset = 15
-        private readonly attributeRelationConnectorRadius = 3
         private readonly headerHeight = 30
 
         private readonly header:  EntityPart<Rectangle>
         private readonly attributesContainer: EntityPart<Rectangle>
-        private attributes: EntityAttribute[]
-        private selectedPart: Optional<EntityPart<Rectangle>>
+        private attributes: EntityAttribute[] = []
+        private selectedPart: Optional<EntityPart<Rectangle>> = null
 
         // TODO: save styles, related to each entity rather than context
 
@@ -67,8 +121,6 @@ export namespace CrowsFootNotation {
                 "attributes",
                 new Rectangle(x, y + this.headerHeight, this.minWidth, this.minAttributesHeight),
             )
-            this.attributes = []
-            this.selectedPart = null
         }
 
         private RenderHeader(this: Entity, ctx: CanvasRenderingContext2D) {
@@ -88,56 +140,12 @@ export namespace CrowsFootNotation {
             ctx.fillStyle = "white"
             this.attributesContainer.shape.Render(ctx, true)
 
+            // TODO: use partial reset
             ctx.fillStyle = "black"
-            ctx.textAlign = "left"
 
             for (const attribute of this.attributes) {
-                const [attrTextPos] = attribute.GetTextPosition()
-                let supportsRelationships = false
-
-                ctx.fillText(attribute.GetText(), attrTextPos.x, attrTextPos.y, this.GetWidth())
-
-                if (attribute.IsPrimaryKey()) {
-                    supportsRelationships = true
-                    const pkTextInfo = ctx.measureText("PK")
-                    ctx.fillText("PK", attrTextPos.x + this.GetWidth() - pkTextInfo.width - this.attributeModifierOffset, attrTextPos.y)
-                }
-
-                if (attribute.IsForeignKey()) {
-                    supportsRelationships = true
-                    const fkTextInfo = ctx.measureText("FK")
-                    ctx.fillText("FK", attrTextPos.x + this.GetWidth() - fkTextInfo.width - this.attributeModifierOffset, attrTextPos.y)
-                }
-
-                if (supportsRelationships) {
-                    ctx.fillStyle = "blue"
-                    ctx.beginPath()
-                    ctx.arc(
-                        this.attributesContainer.shape.topLeftCorner.x,
-                        attrTextPos.y,
-                        this.attributeRelationConnectorRadius,
-                        0,
-                        Math.PI * 2,
-                    )
-                    ctx.fill()
-                    ctx.stroke()
-
-                    ctx.beginPath()
-                    ctx.arc(
-                        this.attributesContainer.shape.topLeftCorner.x + this.GetWidth(),
-                        attrTextPos.y,
-                        this.attributeRelationConnectorRadius,
-                        0,
-                        Math.PI * 2,
-                    )
-                    ctx.fill()
-                    ctx.stroke()
-
-                    ctx.fillStyle = "black"
-                }
+                attribute.Render(ctx)
             }
-
-            resetCanvasContextProps(ctx)
         }
 
         override SetName(this: Entity, name: string) {
@@ -169,8 +177,10 @@ export namespace CrowsFootNotation {
             this.header.shape.topLeftCorner.Set(x, y)
             this.attributesContainer.shape.topLeftCorner.Set(x, y + this.header.shape.height)
             this.attributes.forEach((attribute, i) => {
-                attribute.shape.topLeftCorner.x = this.attributesContainer.shape.topLeftCorner.x
-                attribute.shape.topLeftCorner.y = this.attributesContainer.shape.topLeftCorner.y + this.firstAttributeOffset + i * this.attributeHeight
+                attribute.SetPosition(
+                    this.attributesContainer.shape.topLeftCorner.x,
+                    this.attributesContainer.shape.topLeftCorner.y + this.firstAttributeOffset + i * this.attributeHeight,
+                )
             })
         }
 
@@ -246,7 +256,6 @@ export namespace CrowsFootNotation {
             return null
         }
 
-        // TODO: maybe save selected part reference instead of name
         GetSelectedPart(this: Entity): Optional<EntityPart<Rectangle>> {
             return this.selectedPart
         }
@@ -272,4 +281,13 @@ export namespace CrowsFootNotation {
             ctx.clearRect(this.header.shape.topLeftCorner.x, this.header.shape.topLeftCorner.y, this.GetWidth(), this.GetHeight())
         }
     }
+
+    export enum RelationType {
+        SingleOptional,
+        SingleRequired,
+        ManyOptional,
+        ManyRequired,
+    }
+
+    export class Relationship extends BaseRelationship<RelationType> {}
 }

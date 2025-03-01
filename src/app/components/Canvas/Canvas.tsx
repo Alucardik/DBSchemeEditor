@@ -18,6 +18,7 @@ import styles from "./Canvas.module.scss"
 const controlKeys = new Set([Key.Shift, Key.Control, Key.Alt, Key.Meta, Key.ArrowUp, Key.ArrowDown])
 
 export default function Canvas() {
+    // TODO: remove debug
     console.log("render canvas")
 
     // consts
@@ -33,16 +34,15 @@ export default function Canvas() {
     // state variables
     // TODO: save entities and current notation to local storage and upload from there on startup
     const entities = [] as BaseEntity[]
-    const relatioships = [] as BaseRelationship[]
+    const relationships = [] as BaseRelationship<any>[]
     const canvasOffset = new Point(0, 0)
     const cursor = new Cursor()
 
+    // TODO: maybe incapsulate in a separate state-manager class
     let inEditMode = false
-
     let draggedEntityOffset: Optional<Point> = null
-    let draggedEntityIndex = -1
-    // TODO: maybe replace with optional entity
-    let editedEntityIndex = -1
+    let draggedEntity: Optional<BaseEntity> = null
+    let editedEntity: Optional<BaseEntity> = null
 
     let lastFrameID = 0
     let lastMouseDownTimestamp = 0
@@ -95,12 +95,12 @@ export default function Canvas() {
         const canvasCtx = getCanvasCtx()
         canvasCtx.clearRect(canvasOffset.x, canvasOffset.y, canvasCtx.canvas.width, canvasCtx.canvas.height)
 
-        for (let i = 0; i < entities.length; ++i) {
-            entities[i].Render(canvasCtx)
+        for (const entity of entities) {
+            entity.Render(canvasCtx)
         }
 
-        for (let i = 0; i < relatioships.length; ++i) {
-            relatioships[i].Render(canvasCtx)
+        for (const relationship of relationships) {
+            relationship.Render(canvasCtx)
         }
     }
 
@@ -123,25 +123,50 @@ export default function Canvas() {
         }
     }, [])
 
+    const enterEditMode = (mouseX: number, mouseY: number) => {
+        if (!editedEntity) {
+            return
+        }
 
+        inEditMode = true
 
-    // TODO: change to find instead of find index
+        const canvasCtx = getCanvasCtx()
+        const interactedPart = editedEntity?.GetInteractedPart(canvasOffset.Translate(mouseX, mouseY))
+
+        if (interactedPart) {
+            animate(() => {
+                editedEntity?.SelectPart(interactedPart.name, canvasCtx)
+            })
+        }
+
+        editedEntityStore.Set({entity: editedEntity})
+    }
+
+    const exitEditMode = () => {
+        inEditMode = false
+
+        // remove highlight on edit mode exit
+        editedEntity?.Unselect()
+        animate(renderERD)
+        editedEntityStore.Set({entity: null})
+    }
+
     const getEntityBeingEdited =  (e: MouseEvent<HTMLCanvasElement>) => {
-        return entities.findIndex((entity: BaseEntity) =>
+        return entities.find((entity: BaseEntity) =>
             entity.GetInteractedPart(canvasOffset.Translate(e.clientX, e.clientY))
-        )
+        ) || null
     }
 
     const renderCursor = () => {
-        if (editedEntityIndex === -1) {
+        if (!editedEntity) {
             return
         }
 
         // re-rendering whole entity with cursor for now
         const canvasCtx = getCanvasCtx()
 
-        entities[editedEntityIndex].Clear(canvasCtx)
-        entities[editedEntityIndex].Render(canvasCtx)
+        editedEntity.Clear(canvasCtx)
+        editedEntity.Render(canvasCtx)
         cursor.Render(canvasCtx)
     }
 
@@ -162,7 +187,7 @@ export default function Canvas() {
     }
 
     const updateEntityPositionOnDrag = () => {
-        if (draggedEntityIndex === -1) {
+        if (!draggedEntity) {
             return
         }
 
@@ -170,18 +195,18 @@ export default function Canvas() {
         const mouseY = mousePositionRef.current.y
 
         if (!draggedEntityOffset) {
-            const entityPos = entities[draggedEntityIndex].GetPosition()
+            const entityPos = draggedEntity.GetPosition()
             draggedEntityOffset = new Point(mouseX - entityPos.x, mouseY - entityPos.y)
         }
 
-        entities[draggedEntityIndex].SetPosition(mouseX - draggedEntityOffset.x, mouseY - draggedEntityOffset.y)
+        draggedEntity.SetPosition(mouseX - draggedEntityOffset.x, mouseY - draggedEntityOffset.y)
         renderERD()
 
         animate(updateEntityPositionOnDrag)
     }
 
     const updateEntityPartOnKeyPress = (e: KeyboardEvent<HTMLCanvasElement>) => {
-        if (!inEditMode || editedEntityIndex === -1) {
+        if (!inEditMode || !editedEntity) {
             return
         }
 
@@ -190,9 +215,7 @@ export default function Canvas() {
             return
         }
 
-        const editedEntity = entities[editedEntityIndex]
         const selectedPart = editedEntity.GetSelectedPart()
-
         if (!selectedPart) {
             return
         }
@@ -207,9 +230,7 @@ export default function Canvas() {
         switch (e.key) {
             case Key.Escape:
             case Key.Enter:
-                inEditMode = false
-                editedEntity.Unselect()
-                editedEntityStore.Set({entity: null})
+                exitEditMode()
                 return
             default:
                 metaAPressed = cursor.HandleKeyInput(e)
@@ -225,11 +246,11 @@ export default function Canvas() {
         selectedPart.SetText(cursor.GetEditedString())
 
         animate(() => {
-            editedEntity.Clear(canvasCtx)
-            editedEntity.Render(canvasCtx)
+            editedEntity?.Clear(canvasCtx)
+            editedEntity?.Render(canvasCtx)
 
             if (metaAPressed) {
-                editedEntity.SelectPart(selectedPart.name, canvasCtx)
+                editedEntity?.SelectPart(selectedPart.name, canvasCtx)
             }
 
             cursor.Render(canvasCtx, !metaAPressed)
@@ -246,10 +267,10 @@ export default function Canvas() {
 
     const handleEditOnDoubleClick = (e: MouseEvent<HTMLCanvasElement>) => {
         cancelAnimationFrame(lastFrameID)
-        draggedEntityIndex = -1
+        draggedEntity = null
 
-        editedEntityIndex = getEntityBeingEdited(e)
-        if (editedEntityIndex === -1) {
+        editedEntity = getEntityBeingEdited(e)
+        if (!editedEntity) {
             addEntityOnClick(e)
             return
         }
@@ -259,33 +280,16 @@ export default function Canvas() {
             return
         }
 
-        inEditMode = true
-        const canvasCtx = getCanvasCtx()
-
-        const interactedPart = entities[editedEntityIndex].GetInteractedPart(canvasOffset.Translate(e.clientX, e.clientY))
-        if (interactedPart) {
-            animate(() => {
-                entities[editedEntityIndex].SelectPart(interactedPart.name, canvasCtx)
-            })
-        }
-
-        editedEntityStore.Set({entity: entities[editedEntityIndex]})
+        enterEditMode(e.clientX, e.clientY)
     }
 
     const dragEntityOnMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
         const isDoubleClick = e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS
         lastMouseDownTimestamp = e.timeStamp
 
-        const editedEntityIndex = getEntityBeingEdited(e)
-
-        // TODO: move entering | exiting edit mode to a separate function
-        if (inEditMode && editedEntityIndex === -1) {
-            inEditMode = false
-            editedEntityStore.Set({ entity: null })
-
-            // remove highlight on edit mode exit
-            animate(renderERD)
-
+        editedEntity = getEntityBeingEdited(e)
+        if (inEditMode && !editedEntity) {
+            exitEditMode()
             return
         }
 
@@ -296,8 +300,8 @@ export default function Canvas() {
 
         // TODO: detect single click to enter edit mode
 
-        draggedEntityIndex = editedEntityIndex
-        if (draggedEntityIndex === -1) {
+        draggedEntity = editedEntity
+        if (!draggedEntity) {
             addEntityOnClick(e)
             return
         }
@@ -306,11 +310,11 @@ export default function Canvas() {
     }
 
     const dropEntityOnMouseUp = (e: MouseEvent<HTMLCanvasElement>) => {
-        if (draggedEntityIndex === -1) {
+        if (!draggedEntity) {
             return
         }
 
-        draggedEntityIndex = -1
+        draggedEntity = null
         draggedEntityOffset = null
         cancelAnimationFrame(lastFrameID)
     }
