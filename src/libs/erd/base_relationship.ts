@@ -3,7 +3,7 @@ import { resetCanvasContextProps } from "@/libs/render/canvas"
 import { Point, Shape } from "@/libs/render/shapes"
 import { Optional } from "@/libs/utils/types"
 
-class RelationshipParticipant<RT extends any> {
+export class RelationshipParticipant<RT extends any> {
     private position: Point
     private attribute: BaseEntityAttribute<Shape>
     private relationType: RT

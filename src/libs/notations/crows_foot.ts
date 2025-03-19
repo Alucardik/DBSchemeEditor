@@ -1,7 +1,7 @@
 import { BaseEntity, BaseEntityAttribute, EntityPart } from "@/libs/erd/base_entity"
 import { BaseRelationship } from "@/libs/erd/base_relationship"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
-import { Ellipse, Point, Rectangle } from "@/libs/render/shapes"
+import { Ellipse, Point, Rectangle, ShapeRenderMode } from "@/libs/render/shapes"
 import type { Optional } from "@/libs/utils/types"
 
 export namespace CrowsFootNotation {
@@ -83,7 +83,7 @@ export namespace CrowsFootNotation {
             if (supportsRelationships) {
                 ctx.fillStyle = "blue"
                 for (const connector of this.relationConnectors) {
-                    connector.Render(ctx, true)
+                    connector.Render(ctx)
                 }
             }
 
@@ -127,7 +127,7 @@ export namespace CrowsFootNotation {
             const [headerTextPos] = this.header.GetTextPosition()
 
             ctx.fillStyle = "white"
-            this.header.shape.Render(ctx, true)
+            this.header.shape.Render(ctx)
 
             ctx.fillStyle = "black"
             ctx.textAlign = "center"
@@ -138,7 +138,7 @@ export namespace CrowsFootNotation {
 
         private RenderAttributes(this: Entity, ctx: CanvasRenderingContext2D) {
             ctx.fillStyle = "white"
-            this.attributesContainer.shape.Render(ctx, true)
+            this.attributesContainer.shape.Render(ctx)
 
             // TODO: use partial reset
             ctx.fillStyle = "black"
@@ -184,6 +184,16 @@ export namespace CrowsFootNotation {
             })
         }
 
+        Highlight(this: Entity, ctx: CanvasRenderingContext2D) {
+            ctx.fillStyle = "white"
+            ctx.strokeStyle = "blue"
+
+            this.attributesContainer.shape.Render(ctx, ShapeRenderMode.OutlineOnly)
+            this.header.shape.Render(ctx, ShapeRenderMode.OutlineOnly)
+
+            resetCanvasContextProps(ctx)
+        }
+
         GetInteractedPart(this: Entity, p: Point): Optional<EntityPart<Rectangle>> {
             if (this.header.shape.ContainsPoint(p)) {
                 return this.header
@@ -205,24 +215,27 @@ export namespace CrowsFootNotation {
             let partTextPos: Optional<Point> = null
             let text = ""
 
-            if (partName === this.header.name) {
-                [partTextPos] = this.header.GetTextPosition()
-                text = this.header.GetText()
-                this.selectedPart = this.header
-            }
+            this.selectedPart = null
 
-            // TODO: maybe store attributes name -> index mapping separately
-            if (!partTextPos) {
-                const attr = this.attributes.find((attr) => attr.name === partName)
-                if (attr) {
+            switch (partName) {
+                case this.header.name:
+                    [partTextPos] = this.header.GetTextPosition()
+                    text = this.header.GetText()
+                    this.selectedPart = this.header
+                    break
+                default:
+                    // TODO: maybe store attributes name -> index mapping separately
+                    const attr = this.attributes.find((attr) => attr.name === partName)
+                    if (!attr) {
+                        return
+                    }
+
                     [partTextPos] = attr.GetTextPosition()
                     text = attr.GetText()
                     this.selectedPart = attr
-                }
             }
 
             if (!partTextPos) {
-                this.selectedPart = null
                 return
             }
 

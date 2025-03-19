@@ -1,4 +1,4 @@
-import { canvasUpdateEvent } from "@/app/events"
+import { editedEntityChanged } from "@/app/events"
 import useStore from "@/app/hooks/use_store"
 import { canvasOffsetStore, editedEntityStore, notationStore } from "@/app/stores"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
@@ -25,25 +25,25 @@ export default function WidgetsMenu() {
             <div className={styles["widgets-menu"]} style={{left: entityPos.x - canvasOffset.x, top: entityPos.y - canvasOffset.y}}>
                 <button className={styles["widgets-menu__button"]} onClick={() => {
                     crowsFootEntity.AddAttribute("New Attribute", "string")
-                    canvasUpdateEvent.Dispatch(null)
+                    editedEntityChanged.Dispatch(null)
                 }}>
                     Add Attribute
                 </button>
                 <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
                     selectedAttr?.SetAsPrimaryKey()
-                    canvasUpdateEvent.Dispatch(null)
+                    editedEntityChanged.Dispatch(null)
                 }}>
                     Set as PK
                 </button>
                 <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
                     selectedAttr?.SetAsForeignKey()
-                    canvasUpdateEvent.Dispatch(null)
+                    editedEntityChanged.Dispatch(null)
                 }}>
                     Set as FK
                 </button>
                 <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
                     selectedAttr?.RemoveModifiers()
-                    canvasUpdateEvent.Dispatch(null)
+                    editedEntityChanged.Dispatch(null)
                 }}>
                     Remove Modifiers
                 </button>

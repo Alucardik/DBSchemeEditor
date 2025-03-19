@@ -53,6 +53,10 @@ export abstract class BaseEntity {
         BaseEntity.counter++
     }
 
+    GetID(this: BaseEntity) {
+        return this.id
+    }
+
     GetName(this: BaseEntity) {
         return this.name
     }
@@ -66,6 +70,8 @@ export abstract class BaseEntity {
     abstract GetPosition(): Point
 
     abstract SetPosition(x: number, y: number): void
+
+    abstract Highlight(ctx: CanvasRenderingContext2D): void
 
     abstract GetInteractedPart(p: Point): Optional<EntityPart<Shape>>
 

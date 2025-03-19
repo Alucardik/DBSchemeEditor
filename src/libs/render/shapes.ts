@@ -18,15 +18,26 @@ class Point {
         return new Point(this.x + xOffset, this.y + yOffset)
     }
 
+    Move(this: Point, xOffset: number, yOffset: number) {
+        this.x += xOffset
+        this.y += yOffset
+    }
+
     Expand(this: Point): [number, number] {
         return [this.x, this.y]
     }
 }
 
+enum ShapeRenderMode {
+    BodyOnly,
+    OutlineOnly,
+    BodyWithOutline,
+}
+
 interface Shape {
     GetPivotPoint(): Point
     ContainsPoint(point: Point): boolean
-    Render(ctx: CanvasRenderingContext2D, withOutline: boolean): void
+    Render(ctx: CanvasRenderingContext2D, renderMode: ShapeRenderMode): void
 }
 
 class Rectangle implements Shape {
@@ -49,9 +60,12 @@ class Rectangle implements Shape {
             (point.y >= this.topLeftCorner.y && point.y <= this.topLeftCorner.y + this.height)
     }
 
-    Render(this: Rectangle, ctx: CanvasRenderingContext2D, withOutline: boolean = false): void {
-        ctx.fillRect(this.topLeftCorner.x, this.topLeftCorner.y, this.width, this.height)
-        if (withOutline) {
+    Render(this: Rectangle, ctx: CanvasRenderingContext2D, renderMode: ShapeRenderMode = ShapeRenderMode.BodyWithOutline): void {
+        if (renderMode !== ShapeRenderMode.OutlineOnly) {
+            ctx.fillRect(this.topLeftCorner.x, this.topLeftCorner.y, this.width, this.height)
+        }
+
+        if (renderMode !== ShapeRenderMode.BodyOnly) {
             ctx.strokeRect(this.topLeftCorner.x, this.topLeftCorner.y, this.width, this.height)
         }
     }
@@ -77,43 +91,19 @@ class Ellipse implements Shape {
             Square(point.y - this.center.y) / Square(this.yRadius) <= 1
     }
 
-    Render(this: Ellipse, ctx: CanvasRenderingContext2D, withOutline: boolean = false): void {
+    Render(this: Ellipse, ctx: CanvasRenderingContext2D, renderMode: ShapeRenderMode = ShapeRenderMode.BodyWithOutline ): void {
         ctx.beginPath()
-        ctx.ellipse(this.center.x, this.center.y, this.xRadius, this.yRadius, 0, 0, Math.PI * 2, false)
-        ctx.fill()
-        if (withOutline) {
+
+        if (renderMode !== ShapeRenderMode.OutlineOnly) {
+            ctx.ellipse(this.center.x, this.center.y, this.xRadius, this.yRadius, 0, 0, Math.PI * 2, false)
+            ctx.fill()
+        }
+
+        if (renderMode !== ShapeRenderMode.BodyOnly) {
             ctx.stroke()
         }
-        ctx.closePath()
     }
 }
-
-// class MultiShape implements Shape {
-//     private shapes: Shape[]
-//
-//     AddShapes(this: MultiShape, ...shapes: Shape[]) {
-//         this.shapes.push(...shapes)
-//     }
-//
-//     GetPivotPoint(this: MultiShape): Point {
-//         if (this.shapes.length > 0) {
-//             return this.shapes[0].GetPivotPoint()
-//         }
-//
-//         return new Point(-1, -1)
-//     }
-//
-//     ContainsPoint(this: MultiShape, point: Point): boolean {
-//         return this.shapes
-//     }
-//
-//     Render(this: MultiShape, ctx: CanvasRenderingContext2D, withOutline: boolean = false): void {
-//
-//     }
-//
-// }
-
-
 
 export type {
     Shape,
@@ -121,6 +111,7 @@ export type {
 
 export {
     Point,
+    ShapeRenderMode,
     Rectangle,
     Ellipse,
 }
