@@ -3,14 +3,19 @@ import { resetCanvasContextProps } from "@/libs/render/canvas"
 import { Point, Shape } from "@/libs/render/shapes"
 import { Optional } from "@/libs/utils/types"
 
+export enum ParticipantType {
+    First = "first",
+    Second = "second",
+}
+
 export class RelationshipParticipant<RT extends any> {
     private position: Point
-    private attribute: BaseEntityAttribute<Shape>
+    private attribute: Optional<BaseEntityAttribute<Shape>>
     private relationType: RT
 
-    constructor(position: Point, entity: BaseEntityAttribute<Shape>, relationType: RT) {
-        this.position = position
-        this.attribute = entity
+    constructor(relationType: RT, position?: Point, entity?: BaseEntityAttribute<Shape>) {
+        this.position = position ? position : new Point(-1, -1)
+        this.attribute = entity ? entity : null
         this.relationType = relationType
     }
 
@@ -40,15 +45,100 @@ export class RelationshipParticipant<RT extends any> {
 }
 
 export class BaseRelationship<RT extends any> {
+    private static counter: number = 0
+    private readonly id: number
     protected firstParticipant: Optional<RelationshipParticipant<RT>> = null
     protected secondParticipant: Optional<RelationshipParticipant<RT>> = null
 
-    SetFirstParticipant(participant: RelationshipParticipant<RT>): void {
+    constructor() {
+        this.id = BaseRelationship.counter
+        BaseRelationship.counter++
+    }
+
+    GetID(this:BaseRelationship<RT>): number {
+        return this.id
+    }
+
+    UnsetFirstParticipant(this: BaseRelationship<RT>): void {
+        this.firstParticipant = null
+    }
+
+    SetFirstParticipant(this: BaseRelationship<RT>, participant: RelationshipParticipant<RT>): void {
+        if (this.secondParticipant?.GetEntityAttribute() === participant.GetEntityAttribute()) {
+            console.warn("tried to assign the same attribute to both sides of the relationship")
+            return
+        }
+
         this.firstParticipant = participant
     }
 
-    SetSecondParticipant(participant: RelationshipParticipant<RT>): void {
+    GetFirstParticipant(this: BaseRelationship<RT>): Optional<RelationshipParticipant<RT>> {
+        return this.firstParticipant
+    }
+
+    UnsetSecondParticipant(this: BaseRelationship<RT>): void {
+        this.secondParticipant = null
+    }
+
+    SetSecondParticipant(this: BaseRelationship<RT>, participant: RelationshipParticipant<RT>): void {
+        if (this.firstParticipant?.GetEntityAttribute() === participant.GetEntityAttribute()) {
+            console.warn("tried to assign the same attribute to both sides of the relationship")
+            return
+        }
+
         this.secondParticipant = participant
+    }
+
+    GetSecondParticipant(this: BaseRelationship<RT>): Optional<RelationshipParticipant<RT>> {
+        return this.secondParticipant
+    }
+
+    GetSpareParticipants(this: BaseRelationship<RT>): ParticipantType[] {
+        const ret: ParticipantType[] = []
+
+        if (!this.firstParticipant?.GetEntityAttribute()) {
+            ret.push(ParticipantType.First)
+        }
+
+        if (!this.secondParticipant?.GetEntityAttribute()) {
+            ret.push(ParticipantType.Second)
+        }
+
+        return ret
+    }
+
+    DetachParticipants(this: BaseRelationship<RT>): void {
+        this.firstParticipant?.GetEntityAttribute()?.DetachFromRelationship()
+        this.secondParticipant?.GetEntityAttribute()?.DetachFromRelationship()
+    }
+
+    CheckAttributeParticipationType(this: BaseRelationship<RT>, attribute: BaseEntityAttribute<Shape>): Optional<ParticipantType> {
+        if (this.firstParticipant?.GetEntityAttribute() === attribute) {
+            return ParticipantType.First
+        }
+
+        if (this.secondParticipant?.GetEntityAttribute() === attribute) {
+            return ParticipantType.Second
+        }
+
+        return null
+    }
+
+    CheckAttributeParticipation(this: BaseRelationship<RT>, attribute: BaseEntityAttribute<Shape>): Optional<RelationshipParticipant<RT>> {
+        const participantType = this.CheckAttributeParticipationType(attribute)
+        if (!participantType) {
+            return null
+        }
+
+        if (participantType === ParticipantType.First) {
+            return this.firstParticipant
+        }
+
+        if (participantType === ParticipantType.Second) {
+            return this.secondParticipant
+        }
+
+        return null
     }
 
     Render(this: BaseRelationship<RT>, ctx: CanvasRenderingContext2D) {

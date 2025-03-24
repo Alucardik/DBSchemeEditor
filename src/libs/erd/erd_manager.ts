@@ -1,5 +1,5 @@
 import { BaseEntity } from "@/libs/erd/base_entity"
-import { BaseRelationship, RelationshipParticipant } from "@/libs/erd/base_relationship"
+import { BaseRelationship } from "@/libs/erd/base_relationship"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
 import { Point } from "@/libs/render/shapes"
 import { Optional } from "@/libs/utils/types"
@@ -38,19 +38,17 @@ export default class ERDManager {
 
     AddRelationship(
         this: ERDManager,
-        firstParticipant: Optional<RelationshipParticipant<any>>,
-        secondParticipant: Optional<RelationshipParticipant<any>>,
+        relationship: BaseRelationship<any>,
     ) {
-        const relationShip = new BaseRelationship()
-        if (firstParticipant) {
-            relationShip.SetFirstParticipant(firstParticipant)
-        }
+        this.relationships.push(relationship)
+    }
 
-        if (secondParticipant) {
-            relationShip.SetSecondParticipant(secondParticipant)
+    RemoveRelationshipByID(this: ERDManager, id: number) {
+        const idxToRemove = this.relationships.findIndex((relationship: BaseRelationship<any>) => relationship.GetID() === id)
+        if (idxToRemove !== -1) {
+            this.relationships[idxToRemove].DetachParticipants()
+            this.relationships.splice(idxToRemove, 1)
         }
-
-        this.relationships.push(relationShip)
     }
 
     GetRelationships(this: ERDManager): ReadonlyArray<BaseRelationship<any>> {

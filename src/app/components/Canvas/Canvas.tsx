@@ -1,9 +1,17 @@
 "use client"
 
 import EditModeManager from "@/app/components/Canvas/edit_mode_manager"
-import { editedEntityChanged, enteredEditMode, exitedEntityMode } from "@/app/events"
+import {
+    editedEntityChanged,
+    enteredEditMode,
+    exitedEntityMode,
+    relationEditingFinished,
+    relationEditingStarted
+} from "@/app/events"
 import useMousePosition from "@/app/hooks/use_mouse_position"
 import { canvasOffsetStore, notationStore } from "@/app/stores"
+import { BaseEntityAttribute } from "@/libs/erd/base_entity"
+import { BaseRelationship, ParticipantType } from "@/libs/erd/base_relationship"
 import ERDManager from "@/libs/erd/erd_manager"
 import CanvasRenderingContext2DStub from "@/libs/html_stubs/canvas_rendering_context_2d"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
@@ -36,7 +44,7 @@ export default function Canvas() {
         lastFrameID = requestAnimationFrame(animationCallback)
     }
 
-const renderERD = () => {
+    const renderERD = () => {
         const entities = erdManager.GetEntities()
         const relationships = erdManager.GetRelationships()
 
@@ -125,6 +133,16 @@ const renderERD = () => {
         animate(updateEntityPositionOnDrag)
     }
 
+    const updateRelationshipParticipantPositionOnDrag = (participantType: ParticipantType)=> {
+        if (!editModeManager.GetEditedRelationship()) {
+            return
+        }
+
+        editModeManager.UpdateEditedRelationshipPosition(participantType, mousePositionRef.current.x, mousePositionRef.current.y)
+        renderERD()
+        animate(() => updateRelationshipParticipantPositionOnDrag(participantType))
+    }
+
     const addEntityOnClick = (e: ReactMouseEvent<HTMLCanvasElement>)=> {
         const newEntity = new CrowsFootNotation.Entity("random", 0, 0)
         newEntity.SetPosition(canvasOffset.x + e.clientX - newEntity.GetWidth() / 2, canvasOffset.y + e.clientY - newEntity.GetHeight() / 2)
@@ -151,6 +169,29 @@ const renderERD = () => {
 
             editedEntity?.Highlight(ctx)
         })
+    }
+
+    const handleOnRelationEditingStarted = ({ detail: { relationship, participantType }}: CustomEvent<{
+        relationship: BaseRelationship<any>,
+        participantType: ParticipantType,
+    }>) => {
+        // allow one relationship editing at a time
+        if (editModeManager.GetEditedRelationship()) {
+            return
+        }
+
+        erdManager.AddRelationship(relationship)
+        editModeManager.SetEditedRelationship(relationship)
+        animate(() => updateRelationshipParticipantPositionOnDrag(participantType))
+    }
+
+    const handleOnRelationEditingFinished = ({ detail: { relationship }}: CustomEvent<{
+        relationship: BaseRelationship<any>,
+    }>) => {
+        // remove dangling relationship
+        if (!relationship.GetFirstParticipant()?.GetEntityAttribute() || !relationship.GetSecondParticipant()?.GetEntityAttribute()) {
+            erdManager.RemoveRelationshipByID(relationship.GetID())
+        }
     }
 
     const handleOnKeyPress = (e: KeyboardEvent<HTMLCanvasElement>)=> {
@@ -211,14 +252,16 @@ const renderERD = () => {
         const editedEntity = erdManager.CheckInteractedEntityByPosition(canvasOffset.Translate(e.clientX, e.clientY))
 
         editModeManager.UnsetDraggedEntity()
-        editModeManager.SetEditedEntity(editedEntity)
 
-        if (!editModeManager.GetEditedEntity()) {
+        if (!editedEntity) {
+            editModeManager.UnsetEditedEntity()
             addEntityOnClick(e)
             return
         }
 
-        // support multi-notation here
+        editModeManager.SetEditedEntity(editedEntity)
+
+        // TODO: support multi-notation here
         if (erdManager.GetNotationName() !== CrowsFootNotation.GetNotationName()) {
             return
         }
@@ -227,11 +270,15 @@ const renderERD = () => {
     }
 
     const handleOnMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
+        const currentMousePos = canvasOffset.Translate(e.clientX, e.clientY)
         const isDoubleClick = e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS
-        const editedEntity = erdManager.CheckInteractedEntityByPosition(canvasOffset.Translate(e.clientX, e.clientY))
+        const editedEntity = erdManager.CheckInteractedEntityByPosition(currentMousePos)
 
         lastMouseDownTimestamp = e.timeStamp
-        editModeManager.SetEditedEntity(editedEntity)
+
+        // if (!editedEntity) {
+        //     editModeManager.UnsetEditedEntity()
+        // }
 
         if (editModeManager.IsInEditMode() && !editedEntity) {
             editModeManager.ExitEditMode()
@@ -248,7 +295,25 @@ const renderERD = () => {
             return
         }
 
+        const currentlyEditedEntity = editModeManager.GetEditedEntity()
+        const currentlyEditedRelationship = editModeManager.GetEditedRelationship()
+        editModeManager.SetEditedEntity(editedEntity)
+
+        // if there is click on another entity and there is a relationship being edited -
+        //  try to make a connection or drop currently edited relationship
+        if (currentlyEditedRelationship && currentlyEditedEntity && currentlyEditedEntity !== editedEntity) {
+            const attribute = editedEntity.GetInteractedPart(currentMousePos)
+            if (attribute instanceof BaseEntityAttribute) {
+                attribute.AttachToRelationship(currentlyEditedRelationship)
+            }
+
+            // exit edit mode when both the relationship is removed or preserved
+            editModeManager.ExitEditMode()
+            return
+        }
+
         editModeManager.SetDraggedEntity(editedEntity)
+
         animate(updateEntityPositionOnDrag)
     }
 
@@ -259,7 +324,6 @@ const renderERD = () => {
 
         // enter edit mode on entity click
         if (e.timeStamp - lastMouseDownTimestamp <= clickDurationMS) {
-
             editModeManager.EnterEditMode(false)
         }
     }
@@ -273,6 +337,7 @@ const renderERD = () => {
         animateEntities()
     }
 
+
     useEffect(() => {
         ctx = canvasRef.current.getContext("2d") as CanvasRenderingContext2D
         resizeCanvasToScreen()
@@ -281,6 +346,8 @@ const renderERD = () => {
         editedEntityChanged.AddListener(animateEntities)
         enteredEditMode.AddListener(handleOnEnterEditMode)
         exitedEntityMode.AddListener(animateEntities)
+        relationEditingStarted.AddListener(handleOnRelationEditingStarted)
+        relationEditingFinished.AddListener(handleOnRelationEditingFinished)
         notationStore.Set({notation: erdManager.GetNotationName()})
 
         return () => {
@@ -288,6 +355,8 @@ const renderERD = () => {
             editedEntityChanged.RemoveListener(animateEntities)
             enteredEditMode.RemoveListener(handleOnEnterEditMode)
             exitedEntityMode.RemoveListener(animateEntities)
+            relationEditingStarted.RemoveListener(handleOnRelationEditingStarted)
+            relationEditingFinished.RemoveListener(handleOnRelationEditingFinished)
             cancelAnimationFrame(lastFrameID)
         }
     }, [])

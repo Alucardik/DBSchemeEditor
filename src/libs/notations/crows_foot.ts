@@ -1,5 +1,6 @@
+import { relationEditingStarted } from "@/app/events"
 import { BaseEntity, BaseEntityAttribute, EntityPart } from "@/libs/erd/base_entity"
-import { BaseRelationship } from "@/libs/erd/base_relationship"
+import { BaseRelationship, ParticipantType, RelationshipParticipant } from "@/libs/erd/base_relationship"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
 import { Ellipse, Point, Rectangle, ShapeRenderMode } from "@/libs/render/shapes"
 import type { Optional } from "@/libs/utils/types"
@@ -9,18 +10,42 @@ export namespace CrowsFootNotation {
         return "CrowsFoot"
     }
 
+    class EntityRelationConnector extends Ellipse {
+        private isActive: boolean = false
+
+        SetActive(this: EntityRelationConnector): void {
+            this.isActive = true
+        }
+
+        SetIncactive(this: EntityRelationConnector): void {
+            this.isActive = false
+        }
+
+        IsActive(this: EntityRelationConnector): boolean {
+            return this.isActive
+        }
+
+        override Render(this: EntityRelationConnector, ctx: CanvasRenderingContext2D) {
+            ctx.fillStyle = this.isActive ? "red" : "blue"
+            super.Render(ctx)
+            resetCanvasContextProps(ctx)
+        }
+    }
+
     class EntityAttribute extends BaseEntityAttribute<Rectangle> {
         private readonly relationConnectorRadius: number = 3
         private readonly modifierOffset = 15
-        private relationConnectors: [Ellipse, Ellipse]
+        private relationConnectors: [EntityRelationConnector, EntityRelationConnector]
         private primaryKey: boolean = false
         private foreignKey: boolean = false
+        // FIXME: support multiple relationships
+        private associatedRelationship: Optional<Relationship> = null
 
         constructor(name: string, rectangle: Rectangle, text: string = "") {
             super(name, rectangle, text, (r: Rectangle) => [r.GetPivotPoint().Translate(r.width / 10, r.height / 2), false])
             this.relationConnectors = [
-                new Ellipse(new Point(-1, -1), this.relationConnectorRadius, this.relationConnectorRadius),
-                new Ellipse(new Point(-1, -1), this.relationConnectorRadius, this.relationConnectorRadius),
+                new EntityRelationConnector(new Point(-1, -1), this.relationConnectorRadius, this.relationConnectorRadius),
+                new EntityRelationConnector(new Point(-1, -1), this.relationConnectorRadius, this.relationConnectorRadius),
             ]
         }
 
@@ -59,11 +84,91 @@ export namespace CrowsFootNotation {
             }
 
             this.relationConnectors[1].center.x += this.shape.width
+
+            // TODO: attach connector to relationship as well instead of hardcoding
+            if (this.associatedRelationship) {
+                const participant = this.associatedRelationship.CheckAttributeParticipation(this)
+                participant?.SetPosition(this.relationConnectors[0].GetPivotPoint())
+            }
+        }
+
+        AttachToRelationship(this: EntityAttribute, relationship: Relationship) {
+            if (!this.primaryKey && !this.foreignKey) {
+                console.info("Can only attach to PK or FK")
+                return
+            }
+
+            const spareParticipants = relationship.GetSpareParticipants()
+            if (spareParticipants.length == 0) {
+                console.warn("Tried to attach a participant to a closed relationship")
+                return
+            }
+
+            if (spareParticipants[0] === ParticipantType.First) {
+                // TODO: detect left or right side connector
+                relationship.SetFirstParticipant(new RelationshipParticipant(
+                    RelationType.SingleOptional,
+                    this.relationConnectors[0].GetPivotPoint(),
+                    this,
+                ))
+            } else {
+                // TODO: detect left or right side connector
+                relationship.SetSecondParticipant(new RelationshipParticipant(
+                    RelationType.SingleOptional,
+                    this.relationConnectors[0].GetPivotPoint(),
+                    this,
+                ))
+            }
+
+            this.associatedRelationship = relationship
+        }
+
+        DetachFromRelationship(this: EntityAttribute) {
+            if (!this.associatedRelationship) {
+                return
+            }
+
+            const participantType = this.associatedRelationship.CheckAttributeParticipationType(this)
+            if (participantType === ParticipantType.First) {
+                this.associatedRelationship.UnsetFirstParticipant()
+            } else if (participantType === ParticipantType.Second) {
+                this.associatedRelationship.UnsetSecondParticipant()
+            }
+
+            this.associatedRelationship = null
+        }
+
+        CheckInteraction(this: EntityAttribute, p : Point): boolean {
+            if (this.primaryKey || this.foreignKey) {
+                for (const connector of this.relationConnectors) {
+                    if (!connector.ContainsPoint(p)) {
+                        continue
+                    }
+
+                    const relationship = this.associatedRelationship || new Relationship()
+                    if (!this.associatedRelationship) {
+                        relationship.SetFirstParticipant(new RelationshipParticipant(RelationType.SingleOptional, connector.GetPivotPoint(), this))
+                        relationship.SetSecondParticipant(new RelationshipParticipant(RelationType.SingleOptional))
+                        this.associatedRelationship = relationship
+                    }
+
+                    const curParticipantType = relationship.CheckAttributeParticipationType(this) || ParticipantType.First
+                    const participantType = curParticipantType === ParticipantType.First ? ParticipantType.Second : ParticipantType.First
+
+                    connector.SetActive()
+                    relationEditingStarted.Dispatch({ relationship, participantType })
+
+                    return true
+                }
+            }
+
+            return this.shape.ContainsPoint(p)
+
         }
 
         Render(this: EntityAttribute, ctx: CanvasRenderingContext2D) {
             const [attrTextPos] = this.GetTextPosition()
-            let supportsRelationships = this.primaryKey || this.foreignKey
+            const supportsRelationships = this.primaryKey || this.foreignKey
 
             ctx.fillStyle = "black"
             ctx.textAlign = "left"
@@ -81,7 +186,6 @@ export namespace CrowsFootNotation {
             }
 
             if (supportsRelationships) {
-                ctx.fillStyle = "blue"
                 for (const connector of this.relationConnectors) {
                     connector.Render(ctx)
                 }
@@ -199,7 +303,7 @@ export namespace CrowsFootNotation {
                 return this.header
             }
 
-            const editedAttribute = this.attributes.find((attr) => attr.shape.ContainsPoint(p))
+            const editedAttribute = this.attributes.find((attr) => attr.CheckInteraction(p))
             if (editedAttribute) {
                 return editedAttribute
             }

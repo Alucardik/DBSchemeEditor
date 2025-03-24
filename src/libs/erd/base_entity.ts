@@ -1,3 +1,4 @@
+import { BaseRelationship } from "@/libs/erd/base_relationship"
 import { Point, Shape } from "@/libs/render/shapes"
 import type { Optional } from "@/libs/utils/types"
 
@@ -38,7 +39,10 @@ export class EntityPart<S extends Shape> {
     }
 }
 
-export class BaseEntityAttribute<S extends Shape> extends EntityPart<S> {}
+export abstract class BaseEntityAttribute<S extends Shape> extends EntityPart<S> {
+    abstract AttachToRelationship(relationship: BaseRelationship<any>): void
+    abstract DetachFromRelationship(): void
+}
 
 export abstract class BaseEntity {
     private static counter: number = 0
