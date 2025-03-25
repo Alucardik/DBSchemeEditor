@@ -180,9 +180,11 @@ export default function Canvas() {
             return
         }
 
+        const editedParticipant = participantType === ParticipantType.First ? ParticipantType.Second : ParticipantType.First
+
         erdManager.AddRelationship(relationship)
         editModeManager.SetEditedRelationship(relationship)
-        animate(() => updateRelationshipParticipantPositionOnDrag(participantType))
+        animate(() => updateRelationshipParticipantPositionOnDrag(editedParticipant))
     }
 
     const handleOnRelationEditingFinished = ({ detail: { relationship }}: CustomEvent<{
@@ -304,7 +306,7 @@ export default function Canvas() {
         if (currentlyEditedRelationship && currentlyEditedEntity && currentlyEditedEntity !== editedEntity) {
             const attribute = editedEntity.GetInteractedPart(currentMousePos)
             if (attribute instanceof BaseEntityAttribute) {
-                attribute.AttachToRelationship(currentlyEditedRelationship)
+                attribute.AttachToRelationship(currentlyEditedRelationship, currentMousePos)
             }
 
             // exit edit mode when both the relationship is removed or preserved

@@ -39,7 +39,8 @@ export namespace CrowsFootNotation {
         private primaryKey: boolean = false
         private foreignKey: boolean = false
         // FIXME: support multiple relationships
-        private associatedRelationship: Optional<Relationship> = null
+        // private associatedRelationship: Optional<Relationship> = null
+        private associatedRelationships: Map<number, [Relationship, number]> = new Map()
 
         constructor(name: string, rectangle: Rectangle, text: string = "") {
             super(name, rectangle, text, (r: Rectangle) => [r.GetPivotPoint().Translate(r.width / 10, r.height / 2), false])
@@ -85,78 +86,76 @@ export namespace CrowsFootNotation {
 
             this.relationConnectors[1].center.x += this.shape.width
 
-            // TODO: attach connector to relationship as well instead of hardcoding
-            if (this.associatedRelationship) {
-                const participant = this.associatedRelationship.CheckAttributeParticipation(this)
-                participant?.SetPosition(this.relationConnectors[0].GetPivotPoint())
-            }
+            this.associatedRelationships.forEach(([relationship, connectorIdx]) => {
+                const participant = relationship.CheckAttributeParticipation(this)
+                participant?.SetPosition(this.relationConnectors[connectorIdx].GetPivotPoint())
+            })
         }
 
-        AttachToRelationship(this: EntityAttribute, relationship: Relationship) {
+        AttachToRelationship(this: EntityAttribute, relationship: Relationship, mousePos: Point) {
             if (!this.primaryKey && !this.foreignKey) {
                 console.info("Can only attach to PK or FK")
                 return
             }
 
             const spareParticipants = relationship.GetSpareParticipants()
-            if (spareParticipants.length == 0) {
+            if (spareParticipants.length === 0) {
                 console.warn("Tried to attach a participant to a closed relationship")
                 return
             }
 
-            if (spareParticipants[0] === ParticipantType.First) {
-                // TODO: detect left or right side connector
-                relationship.SetFirstParticipant(new RelationshipParticipant(
-                    RelationType.SingleOptional,
-                    this.relationConnectors[0].GetPivotPoint(),
-                    this,
-                ))
-            } else {
-                // TODO: detect left or right side connector
-                relationship.SetSecondParticipant(new RelationshipParticipant(
-                    RelationType.SingleOptional,
-                    this.relationConnectors[0].GetPivotPoint(),
-                    this,
-                ))
-            }
-
-            this.associatedRelationship = relationship
-        }
-
-        DetachFromRelationship(this: EntityAttribute) {
-            if (!this.associatedRelationship) {
+            let connectorIdx = this.relationConnectors.findIndex(connector => connector.ContainsPoint(mousePos))
+            if (connectorIdx === -1) {
+                console.warn("No connector found for relationship")
                 return
             }
 
-            const participantType = this.associatedRelationship.CheckAttributeParticipationType(this)
-            if (participantType === ParticipantType.First) {
-                this.associatedRelationship.UnsetFirstParticipant()
-            } else if (participantType === ParticipantType.Second) {
-                this.associatedRelationship.UnsetSecondParticipant()
+            if (spareParticipants[0] === ParticipantType.First) {
+                relationship.SetFirstParticipant(new RelationshipParticipant(
+                    RelationType.SingleOptional,
+                    this.relationConnectors[connectorIdx].GetPivotPoint(),
+                    this,
+                ))
+            } else {
+                relationship.SetSecondParticipant(new RelationshipParticipant(
+                    RelationType.SingleOptional,
+                    this.relationConnectors[connectorIdx].GetPivotPoint(),
+                    this,
+                ))
             }
 
-            this.associatedRelationship = null
+            this.associatedRelationships.set(relationship.GetID(), [relationship, connectorIdx])
+        }
+
+        DetachFromRelationship(this: EntityAttribute, relationship: Relationship) {
+            if (!this.associatedRelationships.has(relationship.GetID())) {
+                return
+            }
+
+            const participantType = relationship.CheckAttributeParticipationType(this)
+            if (participantType === ParticipantType.First) {
+                relationship.UnsetFirstParticipant()
+            } else if (participantType === ParticipantType.Second) {
+                relationship.UnsetSecondParticipant()
+            }
+
+            this.associatedRelationships.delete(relationship.GetID())
         }
 
         CheckInteraction(this: EntityAttribute, p : Point): boolean {
             if (this.primaryKey || this.foreignKey) {
-                for (const connector of this.relationConnectors) {
+                for (const [idx, connector] of this.relationConnectors.entries()) {
                     if (!connector.ContainsPoint(p)) {
                         continue
                     }
 
-                    const relationship = this.associatedRelationship || new Relationship()
-                    if (!this.associatedRelationship) {
-                        relationship.SetFirstParticipant(new RelationshipParticipant(RelationType.SingleOptional, connector.GetPivotPoint(), this))
-                        relationship.SetSecondParticipant(new RelationshipParticipant(RelationType.SingleOptional))
-                        this.associatedRelationship = relationship
-                    }
-
-                    const curParticipantType = relationship.CheckAttributeParticipationType(this) || ParticipantType.First
-                    const participantType = curParticipantType === ParticipantType.First ? ParticipantType.Second : ParticipantType.First
+                    const relationship = new Relationship()
+                    relationship.SetFirstParticipant(new RelationshipParticipant(RelationType.SingleOptional, connector.GetPivotPoint(), this))
+                    relationship.SetSecondParticipant(new RelationshipParticipant(RelationType.SingleOptional))
 
                     connector.SetActive()
-                    relationEditingStarted.Dispatch({ relationship, participantType })
+                    this.associatedRelationships.set(relationship.GetID(), [relationship, idx])
+                    relationEditingStarted.Dispatch({ relationship, participantType: ParticipantType.First })
 
                     return true
                 }

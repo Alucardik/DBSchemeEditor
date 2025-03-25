@@ -1,4 +1,5 @@
 import { BaseRelationship } from "@/libs/erd/base_relationship"
+import { Relationship } from "@/libs/notations/crows_foot"
 import { Point, Shape } from "@/libs/render/shapes"
 import type { Optional } from "@/libs/utils/types"
 
@@ -40,8 +41,8 @@ export class EntityPart<S extends Shape> {
 }
 
 export abstract class BaseEntityAttribute<S extends Shape> extends EntityPart<S> {
-    abstract AttachToRelationship(relationship: BaseRelationship<any>): void
-    abstract DetachFromRelationship(): void
+    abstract AttachToRelationship(relationship: BaseRelationship<any>, mousePos: Point): void
+    abstract DetachFromRelationship(relationship: Relationship): void
 }
 
 export abstract class BaseEntity {

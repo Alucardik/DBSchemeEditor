@@ -108,8 +108,8 @@ export class BaseRelationship<RT extends any> {
     }
 
     DetachParticipants(this: BaseRelationship<RT>): void {
-        this.firstParticipant?.GetEntityAttribute()?.DetachFromRelationship()
-        this.secondParticipant?.GetEntityAttribute()?.DetachFromRelationship()
+        this.firstParticipant?.GetEntityAttribute()?.DetachFromRelationship(this)
+        this.secondParticipant?.GetEntityAttribute()?.DetachFromRelationship(this)
     }
 
     CheckAttributeParticipationType(this: BaseRelationship<RT>, attribute: BaseEntityAttribute<Shape>): Optional<ParticipantType> {
