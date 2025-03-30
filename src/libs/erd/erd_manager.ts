@@ -22,6 +22,7 @@ export default class ERDManager {
     RemoveEntityByID(this: ERDManager, id: number) {
         const idxToRemove = this.entities.findIndex((entity: BaseEntity) => entity.GetID() === id)
         if (idxToRemove !== -1) {
+            this.entities[idxToRemove].DetachAllRelationships()
             this.entities.splice(idxToRemove, 1)
         }
     }
@@ -53,5 +54,11 @@ export default class ERDManager {
 
     GetRelationships(this: ERDManager): ReadonlyArray<BaseRelationship<any>> {
         return this.relationships
+    }
+
+    CheckInteractedRelationshipByPosition(this: ERDManager, p: Point): Optional<BaseRelationship<any>> {
+        return this.relationships.find((relationship: BaseRelationship<any>) =>
+            relationship.IsInteracted(p)
+        ) || null
     }
 }

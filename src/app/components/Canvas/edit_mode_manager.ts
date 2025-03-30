@@ -1,5 +1,5 @@
 import { enteredEditMode, exitedEntityMode, relationEditingFinished } from "@/app/events"
-import { editedEntityStore } from "@/app/stores"
+import { editedEntityStore, editedRelationshipStore } from "@/app/stores"
 import { BaseEntity } from "@/libs/erd/base_entity"
 import { BaseRelationship, ParticipantType } from "@/libs/erd/base_relationship"
 import { Point } from "@/libs/render/shapes"
@@ -83,12 +83,13 @@ export default class EditModeManager {
     }
 
     EnterEditMode(this: EditModeManager, selectPart: boolean) {
-        if (!this.editedEntity) {
+        if (!this.editedEntity && !this.draggedEntity && !this.editedRelationship) {
             return
         }
 
         this.inEditMode = true
 
+        editedRelationshipStore.Set({relationship: this.editedRelationship})
         editedEntityStore.Set({entity: this.editedEntity})
         enteredEditMode.Dispatch({ selectPart })
     }
@@ -100,16 +101,24 @@ export default class EditModeManager {
 
         this.inEditMode = false
 
+        if (!this.editedEntity && !this.editedRelationship) {
+            exitedEntityMode.Dispatch(null)
+            return
+        }
+
         if (this.editedRelationship) {
+            // TODO: maybe dispatch editedRelationshipChanged event
             relationEditingFinished.Dispatch({ relationship: this.editedRelationship })
-            this.UnsetEditedRelationship()
         }
 
         // remove highlight on edit mode exit
         this.editedEntity?.Unselect()
         this.UnsetEditedEntity()
-        editedEntityStore.Set({entity: null})
+        console.log("exited edit mode ")
+        this.UnsetEditedRelationship()
 
+        editedRelationshipStore.Set({relationship: null})
+        editedEntityStore.Set({entity: null})
         exitedEntityMode.Dispatch(null)
     }
 }

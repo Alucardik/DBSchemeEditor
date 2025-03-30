@@ -142,6 +142,23 @@ export namespace CrowsFootNotation {
             this.associatedRelationships.delete(relationship.GetID())
         }
 
+        DetachAllRelationships(this: EntityAttribute) {
+            this.associatedRelationships.forEach(([relationship]) => {
+                const participantType = relationship.CheckAttributeParticipationType(this)
+                if (participantType === ParticipantType.First) {
+                    relationship.UnsetFirstParticipant()
+                    return
+                }
+
+                if (participantType === ParticipantType.Second) {
+                    relationship.UnsetSecondParticipant()
+                    return
+                }
+            })
+
+            this.associatedRelationships.clear()
+        }
+
         CheckInteraction(this: EntityAttribute, p : Point): boolean {
             if (this.primaryKey || this.foreignKey) {
                 for (const [idx, connector] of this.relationConnectors.entries()) {
@@ -396,6 +413,12 @@ export namespace CrowsFootNotation {
         Clear(this: Entity, ctx: CanvasRenderingContext2D) {
             ctx.clearRect(this.header.shape.topLeftCorner.x, this.header.shape.topLeftCorner.y, this.GetWidth(), this.GetHeight())
         }
+
+        DetachAllRelationships(this: Entity): void {
+            for (const attribute of this.attributes) {
+                attribute.DetachAllRelationships()
+            }
+        }
     }
 
     export enum RelationType {
@@ -405,5 +428,81 @@ export namespace CrowsFootNotation {
         ManyRequired,
     }
 
-    export class Relationship extends BaseRelationship<RelationType> {}
+    enum RelationDirection {
+        Left,
+        Right,
+    }
+
+    export class Relationship extends BaseRelationship<RelationType> {
+        private readonly mandatoryMarkerOffset: number = 25
+        private readonly typeMarkerOffset: number = 15
+        private readonly markerWidth: number = 15
+
+        private renderRelationType(
+            this: Relationship,
+            ctx: CanvasRenderingContext2D,
+            relationType: RelationType,
+            direction: RelationDirection,
+            endPoint: Point,
+        ): void {
+            const mandatoryMarkerOffset = direction === RelationDirection.Left ? this.mandatoryMarkerOffset : -this.mandatoryMarkerOffset
+            const typeMarkerOffset = direction === RelationDirection.Left ? this.typeMarkerOffset : -this.typeMarkerOffset
+
+            ctx.lineWidth = 2
+
+            if (relationType === RelationType.SingleOptional || relationType === RelationType.SingleRequired) {
+                ctx.beginPath()
+                ctx.moveTo(endPoint.x + typeMarkerOffset, endPoint.y + this.markerWidth / 2)
+                ctx.lineTo(endPoint.x + typeMarkerOffset, endPoint.y - this.markerWidth / 2)
+            } else {
+                ctx.beginPath()
+                ctx.moveTo(endPoint.x, endPoint.y + this.markerWidth / 2)
+                ctx.lineTo(endPoint.x + typeMarkerOffset, endPoint.y)
+                ctx.moveTo(endPoint.x, endPoint.y - this.markerWidth / 2)
+                ctx.lineTo(endPoint.x + typeMarkerOffset, endPoint.y)
+            }
+
+            ctx.stroke()
+
+            if (relationType === RelationType.SingleRequired || relationType === RelationType.ManyRequired) {
+                ctx.beginPath()
+                ctx.moveTo(endPoint.x + mandatoryMarkerOffset, endPoint.y + this.markerWidth / 2)
+                ctx.lineTo(endPoint.x + mandatoryMarkerOffset, endPoint.y - this.markerWidth / 2)
+            } else {
+                ctx.lineWidth = 1
+                ctx.fillStyle = "white"
+
+                ctx.beginPath()
+                ctx.ellipse(endPoint.x + mandatoryMarkerOffset, endPoint.y, this.markerWidth / 3, this.markerWidth / 3, 0, 0, Math.PI * 2, false)
+                ctx.fill()
+            }
+
+            ctx.stroke()
+        }
+
+        override Render(ctx: CanvasRenderingContext2D) {
+            if (!this.firstParticipant || !this.secondParticipant) {
+                return
+            }
+
+            super.Render(ctx)
+
+            // TODO: calc direction instead of hardcoding
+            this.renderRelationType(
+                ctx,
+                this.firstParticipant.GetRelationType(),
+                RelationDirection.Left,
+                this.firstParticipant.GetPosition(),
+            )
+
+            this.renderRelationType(
+                ctx,
+                this.secondParticipant.GetRelationType(),
+                RelationDirection.Right,
+                this.secondParticipant.GetPosition(),
+            )
+
+            resetCanvasContextProps(ctx)
+        }
+    }
 }

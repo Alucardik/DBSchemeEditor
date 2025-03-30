@@ -1,6 +1,6 @@
 import { BaseEntityAttribute } from "@/libs/erd/base_entity"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
-import { Point, Shape } from "@/libs/render/shapes"
+import { Point, Rectangle, Shape } from "@/libs/render/shapes"
 import { Optional } from "@/libs/utils/types"
 
 export enum ParticipantType {
@@ -47,6 +47,8 @@ export class RelationshipParticipant<RT extends any> {
 export class BaseRelationship<RT extends any> {
     private static counter: number = 0
     private readonly id: number
+    private readonly lineWidth: number = 2
+    private readonly interactionRadius: number = 3
     protected firstParticipant: Optional<RelationshipParticipant<RT>> = null
     protected secondParticipant: Optional<RelationshipParticipant<RT>> = null
 
@@ -91,6 +93,10 @@ export class BaseRelationship<RT extends any> {
 
     GetSecondParticipant(this: BaseRelationship<RT>): Optional<RelationshipParticipant<RT>> {
         return this.secondParticipant
+    }
+
+    IsComplete(this: BaseRelationship<RT>): boolean {
+        return this.firstParticipant?.GetEntityAttribute() !== null && this.secondParticipant?.GetEntityAttribute() !== null
     }
 
     GetSpareParticipants(this: BaseRelationship<RT>): ParticipantType[] {
@@ -141,12 +147,17 @@ export class BaseRelationship<RT extends any> {
         return null
     }
 
+    Highlight(this: BaseRelationship<RT>, ctx: CanvasRenderingContext2D): void {
+        ctx.strokeStyle = "red"
+        this.Render(ctx)
+    }
+
     Render(this: BaseRelationship<RT>, ctx: CanvasRenderingContext2D) {
         if (!this.firstParticipant || !this.secondParticipant) {
             return
         }
 
-        ctx.lineWidth = 2
+        ctx.lineWidth = this.lineWidth
         ctx.lineCap = "round"
 
         // TODO: prevent lines from crossing entities (add minYOffset / maxLevel?)
@@ -183,5 +194,95 @@ export class BaseRelationship<RT extends any> {
         }
 
         resetCanvasContextProps(ctx)
+    }
+
+    IsInteracted(this: BaseRelationship<RT>, p: Point): boolean {
+        // if one of the participants is not a valid attribute, then this relationship is currently being interacted with
+        if (!this.firstParticipant?.GetEntityAttribute() || !this.secondParticipant?.GetEntityAttribute()) {
+            return false
+        }
+
+        const firstPosition = this.firstParticipant?.GetPosition()
+        const secondPosition = this.secondParticipant?.GetPosition()
+        const offsetX = Math.abs(secondPosition.x - firstPosition.x) / 2
+        // reusing single rectangle for each line segment instead of allocating multiple at one
+        const lineSegment = new Rectangle(0, 0, 0, 0)
+
+        // connection visualisation
+        // --- 0
+        // |
+        // |
+        // ------
+        //       |
+        //       |
+        //   0 ---
+        if (firstPosition.x > secondPosition.x) {
+            const yOffset = (secondPosition.y - firstPosition.y) / 2
+            const yOffsetAbs = Math.abs(yOffset)
+
+            // TODO: count line height as part if width / height
+            // represent each line segment as a rectangle interaction area
+            lineSegment.topLeftCorner.x = firstPosition.x
+            lineSegment.topLeftCorner.y = firstPosition.y - this.interactionRadius
+            lineSegment.width = offsetX
+            lineSegment.height = this.interactionRadius * 2 + this.lineWidth
+            if (lineSegment.ContainsPoint(p)) {
+                return true
+            }
+
+            lineSegment.topLeftCorner.x = firstPosition.x + offsetX - this.interactionRadius
+            lineSegment.topLeftCorner.y = firstPosition.y + yOffset
+            lineSegment.width = this.interactionRadius * 2
+            lineSegment.height = yOffsetAbs
+            if (lineSegment.ContainsPoint(p)) {
+                return true
+            }
+
+            lineSegment.topLeftCorner.x = secondPosition.x - offsetX
+            lineSegment.topLeftCorner.y = firstPosition.y + yOffset - this.interactionRadius
+            lineSegment.width = firstPosition.x - secondPosition.x + offsetX * 2
+            lineSegment.height = this.interactionRadius * 2
+            if (lineSegment.ContainsPoint(p)) {
+                return true
+            }
+
+            lineSegment.topLeftCorner.x = secondPosition.x - offsetX - this.interactionRadius
+            lineSegment.topLeftCorner.y = secondPosition.y - this.interactionRadius
+            lineSegment.width = this.interactionRadius * 2
+            lineSegment.height = yOffsetAbs
+            if (lineSegment.ContainsPoint(p)) {
+                return true
+            }
+
+            lineSegment.topLeftCorner.x = secondPosition.x - offsetX
+            lineSegment.topLeftCorner.y = secondPosition.y - this.interactionRadius
+            lineSegment.width = offsetX
+            lineSegment.height = 2 * this.interactionRadius
+            return lineSegment.ContainsPoint(p)
+        }
+
+        lineSegment.topLeftCorner.x = firstPosition.x
+        lineSegment.topLeftCorner.y = firstPosition.y - this.interactionRadius
+        lineSegment.width = offsetX
+        lineSegment.height = this.interactionRadius * 2 + this.lineWidth + this.lineWidth
+        if (lineSegment.ContainsPoint(p)) {
+            return true
+        }
+
+        lineSegment.topLeftCorner.x = firstPosition.x + offsetX - this.interactionRadius
+        // TODO: add interactionRadius if second position is lower
+        lineSegment.topLeftCorner.y = secondPosition.y - this.interactionRadius
+        lineSegment.width = this.interactionRadius * 2 + this.lineWidth
+        lineSegment.height = Math.abs(secondPosition.y - firstPosition.y) + 2 * this.interactionRadius
+        if (lineSegment.ContainsPoint(p)) {
+            return true
+        }
+
+        lineSegment.topLeftCorner.x = firstPosition.x + offsetX
+        // TODO: add interactionRadius if second position is lower
+        lineSegment.topLeftCorner.y = secondPosition.y - this.interactionRadius
+        lineSegment.width = offsetX
+        lineSegment.height = this.interactionRadius * 2 + this.lineWidth
+        return lineSegment.ContainsPoint(p)
     }
 }

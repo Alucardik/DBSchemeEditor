@@ -3,10 +3,13 @@
 import EditModeManager from "@/app/components/Canvas/edit_mode_manager"
 import {
     editedEntityChanged,
+    editedRelationshipChanged,
     enteredEditMode,
+    EntityOpType,
     exitedEntityMode,
     relationEditingFinished,
-    relationEditingStarted
+    relationEditingStarted,
+    RelationshipOpType
 } from "@/app/events"
 import useMousePosition from "@/app/hooks/use_mouse_position"
 import { canvasOffsetStore, notationStore } from "@/app/stores"
@@ -61,7 +64,7 @@ export default function Canvas() {
         }
     }
 
-    const animateEntities = ()=> {
+    const animateERD = ()=> {
         animate(renderERD)
     }
 
@@ -92,7 +95,7 @@ export default function Canvas() {
         canvas.style.height = document.body.clientHeight + "px"
 
         ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
-        animateEntities()
+        animateERD()
     }
 
     const renderCursor = ()=> {
@@ -124,21 +127,28 @@ export default function Canvas() {
     }
 
     const updateEntityPositionOnDrag = ()=> {
-        if (!editModeManager.GetDraggedEntity()) {
+        const draggedEntity = editModeManager.GetDraggedEntity()
+        if (!draggedEntity) {
             return
         }
 
         editModeManager.UpdateDraggedEntityPosition(mousePositionRef.current.x, mousePositionRef.current.y)
         renderERD()
+        draggedEntity.Highlight(ctx)
         animate(updateEntityPositionOnDrag)
     }
 
     const updateRelationshipParticipantPositionOnDrag = (participantType: ParticipantType)=> {
+        console.log("updateRelationshipParticipantPositionOnDrag", participantType)
         if (!editModeManager.GetEditedRelationship()) {
             return
         }
 
-        editModeManager.UpdateEditedRelationshipPosition(participantType, mousePositionRef.current.x, mousePositionRef.current.y)
+        editModeManager.UpdateEditedRelationshipPosition(
+            participantType,
+            canvasOffset.x + mousePositionRef.current.x,
+            canvasOffset.y + mousePositionRef.current.y,
+        )
         renderERD()
         animate(() => updateRelationshipParticipantPositionOnDrag(participantType))
     }
@@ -148,10 +158,16 @@ export default function Canvas() {
         newEntity.SetPosition(canvasOffset.x + e.clientX - newEntity.GetWidth() / 2, canvasOffset.y + e.clientY - newEntity.GetHeight() / 2)
 
         erdManager.AddEntity(newEntity)
-        animateEntities()
+        animateERD()
     }
 
     const handleOnEnterEditMode = ({ detail: { selectPart } }: CustomEvent<{ selectPart: boolean }>)=> {
+        const editedRelationship = editModeManager.GetEditedRelationship()
+        if (editedRelationship) {
+            editedRelationship.Highlight(ctx)
+            return
+        }
+
         const editedEntity = editModeManager.GetEditedEntity()
         if (!editedEntity) {
             return
@@ -159,7 +175,7 @@ export default function Canvas() {
 
         let interactedPartName: Optional<string> = null
         if (selectPart) {
-            interactedPartName = editedEntity.GetInteractedPart(new Point(mousePositionRef.current.x, mousePositionRef.current.y))?.name || null
+            interactedPartName = editedEntity.GetInteractedPart(canvasOffset.Translate(mousePositionRef.current.x, mousePositionRef.current.y))?.name || null
         }
 
         animate(() => {
@@ -191,8 +207,31 @@ export default function Canvas() {
         relationship: BaseRelationship<any>,
     }>) => {
         // remove dangling relationship
-        if (!relationship.GetFirstParticipant()?.GetEntityAttribute() || !relationship.GetSecondParticipant()?.GetEntityAttribute()) {
+        if (!relationship.IsComplete()) {
             erdManager.RemoveRelationshipByID(relationship.GetID())
+        }
+    }
+
+    const handleOnEditedEntityChanged = ({ detail: { opType, entityID } }: CustomEvent<{ opType: EntityOpType, entityID: number }>)=>  {
+        switch (opType) {
+            case EntityOpType.CHANGED:
+                animateERD()
+                break
+            case EntityOpType.DELETED:
+                // FIXME: remove highlight on deletion
+                erdManager.RemoveEntityByID(entityID)
+                animateERD()
+        }
+    }
+
+    const handleOnEditedRelationshipChanged = ({ detail: { opType, relationshipID } }: CustomEvent<{ opType: RelationshipOpType, relationshipID: number }>)=>  {
+        switch (opType) {
+            case RelationshipOpType.CHANGED:
+                animateERD()
+                break
+            case RelationshipOpType.DELETED:
+                erdManager.RemoveRelationshipByID(relationshipID)
+                animateERD()
         }
     }
 
@@ -275,20 +314,22 @@ export default function Canvas() {
         const currentMousePos = canvasOffset.Translate(e.clientX, e.clientY)
         const isDoubleClick = e.timeStamp - lastMouseDownTimestamp <= doubleClickDurationMS
         const editedEntity = erdManager.CheckInteractedEntityByPosition(currentMousePos)
+        const editedRelationship = erdManager.CheckInteractedRelationshipByPosition(currentMousePos)
 
         lastMouseDownTimestamp = e.timeStamp
 
-        // if (!editedEntity) {
-        //     editModeManager.UnsetEditedEntity()
-        // }
-
-        if (editModeManager.IsInEditMode() && !editedEntity) {
+        if (editModeManager.IsInEditMode() && !editedEntity && !editedRelationship) {
             editModeManager.ExitEditMode()
             return
         }
 
         if (isDoubleClick) {
             handleOnDoubleClick(e)
+            return
+        }
+
+        if (editedRelationship) {
+            editModeManager.SetEditedRelationship(editedRelationship)
             return
         }
 
@@ -299,7 +340,6 @@ export default function Canvas() {
 
         const currentlyEditedEntity = editModeManager.GetEditedEntity()
         const currentlyEditedRelationship = editModeManager.GetEditedRelationship()
-        editModeManager.SetEditedEntity(editedEntity)
 
         // if there is click on another entity and there is a relationship being edited -
         //  try to make a connection or drop currently edited relationship
@@ -315,11 +355,18 @@ export default function Canvas() {
         }
 
         editModeManager.SetDraggedEntity(editedEntity)
+        editModeManager.UnsetEditedEntity()
+        editModeManager.EnterEditMode(false)
 
         animate(updateEntityPositionOnDrag)
     }
 
     const handleOnMouseUp = (e: ReactMouseEvent<HTMLCanvasElement>)=> {
+        const draggedEntity = editModeManager.GetDraggedEntity()
+        if (draggedEntity) {
+            editModeManager.SetEditedEntity(draggedEntity)
+        }
+
         editModeManager.UnsetDraggedEntity()
 
         cancelAnimationFrame(lastFrameID)
@@ -336,27 +383,28 @@ export default function Canvas() {
         canvasOffset.y += e.deltaY
 
         canvasOffsetStore.Set(canvasOffset.Translate(0, 0))
-        animateEntities()
+        animateERD()
     }
-
 
     useEffect(() => {
         ctx = canvasRef.current.getContext("2d") as CanvasRenderingContext2D
         resizeCanvasToScreen()
 
         window.addEventListener("resize", resizeCanvasToScreen)
-        editedEntityChanged.AddListener(animateEntities)
+        editedEntityChanged.AddListener(handleOnEditedEntityChanged)
+        editedRelationshipChanged.AddListener(handleOnEditedRelationshipChanged)
         enteredEditMode.AddListener(handleOnEnterEditMode)
-        exitedEntityMode.AddListener(animateEntities)
+        exitedEntityMode.AddListener(animateERD)
         relationEditingStarted.AddListener(handleOnRelationEditingStarted)
         relationEditingFinished.AddListener(handleOnRelationEditingFinished)
         notationStore.Set({notation: erdManager.GetNotationName()})
 
         return () => {
             window.removeEventListener("resize", resizeCanvasToScreen)
-            editedEntityChanged.RemoveListener(animateEntities)
+            editedEntityChanged.RemoveListener(handleOnEditedEntityChanged)
+            editedRelationshipChanged.RemoveListener(handleOnEditedRelationshipChanged)
             enteredEditMode.RemoveListener(handleOnEnterEditMode)
-            exitedEntityMode.RemoveListener(animateEntities)
+            exitedEntityMode.RemoveListener(animateERD)
             relationEditingStarted.RemoveListener(handleOnRelationEditingStarted)
             relationEditingFinished.RemoveListener(handleOnRelationEditingFinished)
             cancelAnimationFrame(lastFrameID)
