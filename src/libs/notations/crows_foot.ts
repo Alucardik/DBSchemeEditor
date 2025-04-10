@@ -10,6 +10,20 @@ export namespace CrowsFootNotation {
         return "CrowsFoot"
     }
 
+    export enum ModifierType {
+        PrimaryKey = "PK",
+        ForeignKey = "FK",
+        None = "None",
+    }
+
+    export function GetAvailableModifierTypes(): ModifierType[] {
+        return [
+            ModifierType.PrimaryKey,
+            ModifierType.ForeignKey,
+            ModifierType.None,
+        ]
+    }
+
     class EntityRelationConnector extends Ellipse {
         private isActive: boolean = false
 
@@ -36,8 +50,7 @@ export namespace CrowsFootNotation {
         private readonly relationConnectorRadius: number = 3
         private readonly modifierOffset = 15
         private relationConnectors: [EntityRelationConnector, EntityRelationConnector]
-        private primaryKey: boolean = false
-        private foreignKey: boolean = false
+        private modifier: ModifierType = ModifierType.None
         // FIXME: support multiple relationships
         // private associatedRelationship: Optional<Relationship> = null
         private associatedRelationships: Map<number, [Relationship, number]> = new Map()
@@ -50,28 +63,12 @@ export namespace CrowsFootNotation {
             ]
         }
 
-        SetAsPrimaryKey(this: EntityAttribute) {
-            this.primaryKey = true
-            this.foreignKey = false
-
+        GetModifierType(this: EntityAttribute): ModifierType {
+            return this.modifier
         }
 
-        IsPrimaryKey(this: EntityAttribute): boolean {
-            return this.primaryKey
-        }
-
-        SetAsForeignKey(this: EntityAttribute) {
-            this.foreignKey = true
-            this.primaryKey = false
-        }
-
-        IsForeignKey(this: EntityAttribute): boolean {
-            return this.foreignKey
-        }
-
-        RemoveModifiers(this: EntityAttribute) {
-            this.primaryKey = false
-            this.foreignKey = false
+        SetModifierType(this: EntityAttribute, modifier: ModifierType) {
+            this.modifier = modifier
         }
 
         SetPosition(this: EntityAttribute, x: number, y: number) {
@@ -93,7 +90,7 @@ export namespace CrowsFootNotation {
         }
 
         AttachToRelationship(this: EntityAttribute, relationship: Relationship, mousePos: Point) {
-            if (!this.primaryKey && !this.foreignKey) {
+            if (this.modifier === ModifierType.None) {
                 console.info("Can only attach to PK or FK")
                 return
             }
@@ -160,7 +157,7 @@ export namespace CrowsFootNotation {
         }
 
         CheckInteraction(this: EntityAttribute, p : Point): boolean {
-            if (this.primaryKey || this.foreignKey) {
+            if (this.modifier !== ModifierType.None) {
                 for (const [idx, connector] of this.relationConnectors.entries()) {
                     if (!connector.ContainsPoint(p)) {
                         continue
@@ -184,21 +181,16 @@ export namespace CrowsFootNotation {
 
         Render(this: EntityAttribute, ctx: CanvasRenderingContext2D) {
             const [attrTextPos] = this.GetTextPosition()
-            const supportsRelationships = this.primaryKey || this.foreignKey
+            const supportsRelationships = this.modifier !== ModifierType.None
 
             ctx.fillStyle = "black"
             ctx.textAlign = "left"
 
             ctx.fillText(this.GetText(), attrTextPos.x, attrTextPos.y, this.shape.width)
 
-            if (this.primaryKey) {
-                const pkTextInfo = ctx.measureText("PK")
-                ctx.fillText("PK", attrTextPos.x + this.shape.width - pkTextInfo.width - this.modifierOffset, attrTextPos.y)
-            }
-
-            if (this.foreignKey) {
-                const fkTextInfo = ctx.measureText("FK")
-                ctx.fillText("FK", attrTextPos.x + this.shape.width - fkTextInfo.width - this.modifierOffset, attrTextPos.y)
+            if (supportsRelationships) {
+                const modifierTextInfo = ctx.measureText(this.modifier)
+                ctx.fillText(this.modifier, attrTextPos.x + this.shape.width - modifierTextInfo.width - this.modifierOffset, attrTextPos.y)
             }
 
             if (supportsRelationships) {

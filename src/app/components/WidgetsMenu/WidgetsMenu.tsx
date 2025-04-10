@@ -3,14 +3,18 @@ import useStore from "@/app/hooks/use_store"
 import { canvasOffsetStore, editedEntityStore, editedRelationshipStore, notationStore } from "@/app/stores"
 import { RelationshipParticipant } from "@/libs/erd/base_relationship"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
+import { RefObject, useRef } from "react"
 
 import styles from './WidgetsMenu.module.scss'
+import ModifierType = CrowsFootNotation.ModifierType
 
 export default function WidgetsMenu() {
     const { notation } = useStore(notationStore)
     const { entity } = useStore(editedEntityStore)
     const { relationship } = useStore(editedRelationshipStore)
     const canvasOffset = useStore(canvasOffsetStore)
+
+    const modifiersRef = useRef(null) as unknown as RefObject<HTMLDivElement>
 
     // we are only editing fully established relationship
     if (relationship && relationship.IsComplete() && notation === CrowsFootNotation.GetNotationName()) {
@@ -232,6 +236,12 @@ export default function WidgetsMenu() {
         const crowsFootEntity = entity as CrowsFootNotation.Entity
         const selectedAttr = crowsFootEntity.GetSelectedAttribute()
         const modifierButtonDisplayStyle = selectedAttr ? "block" : "none"
+        const currentModifier = selectedAttr?.GetModifierType() || CrowsFootNotation.ModifierType.None
+        const modifierOptions = []
+
+        for (const modifier of CrowsFootNotation.GetAvailableModifierTypes()) {
+            modifierOptions.push((<option key={modifier} value={modifier}>{modifier}</option>))
+        }
 
         return (
             <div className={styles["widgets-menu"]} style={{left: entityPos.x - canvasOffset.x, top: entityPos.y - canvasOffset.y}}>
@@ -252,33 +262,21 @@ export default function WidgetsMenu() {
                 }}>
                     Add Attribute
                 </button>
-                <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
-                    selectedAttr?.SetAsPrimaryKey()
-                    editedEntityChanged.Dispatch({
-                        opType: EntityOpType.CHANGED,
-                        entityID: entity.GetID(),
-                    })
-                }}>
-                    Set as PK
-                </button>
-                <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
-                    selectedAttr?.SetAsForeignKey()
-                    editedEntityChanged.Dispatch({
-                        opType: EntityOpType.CHANGED,
-                        entityID: entity.GetID(),
-                    })
-                }}>
-                    Set as FK
-                </button>
-                <button className={styles["widgets-menu__button"]} style={{display: modifierButtonDisplayStyle}} onClick={() => {
-                    selectedAttr?.RemoveModifiers()
-                    editedEntityChanged.Dispatch({
-                        opType: EntityOpType.CHANGED,
-                        entityID: entity.GetID(),
-                    })
-                }}>
-                    Remove Modifiers
-                </button>
+                <label style={{display: modifierButtonDisplayStyle}} onClick={() => {}}>
+                    Modifiers
+                    <select
+                        className={styles["widgets-menu__list"]}
+                        defaultValue={currentModifier}
+                        onChange={(event) => {
+                            selectedAttr?.SetModifierType(event.target.value as ModifierType)
+                            editedEntityChanged.Dispatch({
+                                opType: EntityOpType.CHANGED,
+                                entityID: entity.GetID(),
+                            })
+                    }}>
+                        {modifierOptions}
+                    </select>
+                </label>
             </div>
         )
     }

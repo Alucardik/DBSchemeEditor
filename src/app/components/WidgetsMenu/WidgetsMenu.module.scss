@@ -17,4 +17,14 @@
   &__button {
     user-select: none;
   }
+
+  &__list-header {
+
+  }
+
+  &__list {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
 }
