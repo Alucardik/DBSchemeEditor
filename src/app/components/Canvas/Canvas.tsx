@@ -139,7 +139,6 @@ export default function Canvas() {
     }
 
     const updateRelationshipParticipantPositionOnDrag = (participantType: ParticipantType)=> {
-        console.log("updateRelationshipParticipantPositionOnDrag", participantType)
         if (!editModeManager.GetEditedRelationship()) {
             return
         }
@@ -347,6 +346,9 @@ export default function Canvas() {
             const attribute = editedEntity.GetInteractedPart(currentMousePos)
             if (attribute instanceof BaseEntityAttribute) {
                 attribute.AttachToRelationship(currentlyEditedRelationship, currentMousePos)
+            } else {
+                // TODO: check if this is correct
+                erdManager.RemoveRelationshipByID(currentlyEditedRelationship.GetID())
             }
 
             // exit edit mode when both the relationship is removed or preserved

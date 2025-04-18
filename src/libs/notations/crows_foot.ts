@@ -1,4 +1,5 @@
 import { relationEditingStarted } from "@/app/events"
+import { editedRelationshipStore } from "@/app/stores"
 import { BaseEntity, BaseEntityAttribute, EntityPart } from "@/libs/erd/base_entity"
 import { BaseRelationship, ParticipantType, RelationshipParticipant } from "@/libs/erd/base_relationship"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
@@ -51,8 +52,7 @@ export namespace CrowsFootNotation {
         private readonly modifierOffset = 15
         private relationConnectors: [EntityRelationConnector, EntityRelationConnector]
         private modifier: ModifierType = ModifierType.None
-        // FIXME: support multiple relationships
-        // private associatedRelationship: Optional<Relationship> = null
+        // FIXME: multiple relationships work incorrectly
         private associatedRelationships: Map<number, [Relationship, number]> = new Map()
 
         constructor(name: string, rectangle: Rectangle, text: string = "") {
@@ -163,13 +163,15 @@ export namespace CrowsFootNotation {
                         continue
                     }
 
-                    const relationship = new Relationship()
-                    relationship.SetFirstParticipant(new RelationshipParticipant(RelationType.SingleOptional, connector.GetPivotPoint(), this))
-                    relationship.SetSecondParticipant(new RelationshipParticipant(RelationType.SingleOptional))
+                    if (!editedRelationshipStore.Get().relationship) {
+                        const relationship = new Relationship()
+                        relationship.SetFirstParticipant(new RelationshipParticipant(RelationType.SingleOptional, connector.GetPivotPoint(), this))
+                        relationship.SetSecondParticipant(new RelationshipParticipant(RelationType.SingleOptional))
+                        this.associatedRelationships.set(relationship.GetID(), [relationship, idx])
+                        relationEditingStarted.Dispatch({ relationship, participantType: ParticipantType.First })
+                    }
 
                     connector.SetActive()
-                    this.associatedRelationships.set(relationship.GetID(), [relationship, idx])
-                    relationEditingStarted.Dispatch({ relationship, participantType: ParticipantType.First })
 
                     return true
                 }
@@ -418,6 +420,30 @@ export namespace CrowsFootNotation {
         SingleRequired,
         ManyOptional,
         ManyRequired,
+    }
+
+    export function GetAvailableRelationTypes(): RelationType[] {
+        return [
+            RelationType.SingleOptional,
+            RelationType.SingleRequired,
+            RelationType.ManyOptional,
+            RelationType.ManyRequired,
+        ]
+    }
+
+    export function RelationTypeToString(relationType: RelationType): string {
+        switch (relationType) {
+            case RelationType.SingleOptional:
+                return "Single Optional"
+            case RelationType.SingleRequired:
+                return "Single Required"
+            case RelationType.ManyOptional:
+                return "Many Optional"
+            case RelationType.ManyRequired:
+                return "Many Required"
+            default:
+                return ""
+        }
     }
 
     enum RelationDirection {

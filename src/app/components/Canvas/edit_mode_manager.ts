@@ -114,7 +114,6 @@ export default class EditModeManager {
         // remove highlight on edit mode exit
         this.editedEntity?.Unselect()
         this.UnsetEditedEntity()
-        console.log("exited edit mode ")
         this.UnsetEditedRelationship()
 
         editedRelationshipStore.Set({relationship: null})
