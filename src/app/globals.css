@@ -1,5 +1,28 @@
+@font-face {
+    font-family: "OpenSans";
+    font-style: normal;
+    font-weight: 400;
+    font-display: auto;
+    src: url("/fonts/OpenSans-Regular.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: "OpenSans";
+    font-style: normal;
+    font-weight: 700;
+    font-display: auto;
+    src: url("/fonts/OpenSans-Bold.ttf") format("truetype");
+}
+
 :root {
+    --button-border-radius: 5px;
+    --color-text-primary: #000;
+    --color-backgroud-primary: #00000015;
+    --color-backgroud-primary-hover: #00000026;
+    --color-accent: #ffbe5c;
+    --color-accent-hover: #ffcb7d;
     --font-size-small: 16px;
+    font-family: "OpenSans", "Arial", sans-serif;
 }
 
 html {
@@ -17,6 +40,16 @@ body {
 
 button {
     cursor: pointer;
+    user-select: none;
+    border-radius: var(--button-border-radius);
+    background-color: var(--color-backgroud-primary);
+    border: none;
+    outline: none;
+
+    &:hover {
+        background-color: var(--color-backgroud-primary-hover);
+        transition: background-color .15s linear;
+    }
 }
 
 input {

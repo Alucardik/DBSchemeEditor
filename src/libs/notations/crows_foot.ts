@@ -43,7 +43,7 @@ export namespace CrowsFootNotation {
         override Render(this: EntityRelationConnector, ctx: CanvasRenderingContext2D) {
             ctx.fillStyle = this.isActive ? "red" : "blue"
             super.Render(ctx)
-            resetCanvasContextProps(ctx)
+            resetCanvasContextProps(ctx, "fillStyle")
         }
     }
 
@@ -106,6 +106,9 @@ export namespace CrowsFootNotation {
                 console.warn("No connector found for relationship")
                 return
             }
+
+            // TODO: check if attributes have already been connected
+            //  and disallow more than one connection
 
             if (spareParticipants[0] === ParticipantType.First) {
                 relationship.SetFirstParticipant(new RelationshipParticipant(
@@ -201,12 +204,12 @@ export namespace CrowsFootNotation {
                 }
             }
 
-            resetCanvasContextProps(ctx)
+            resetCanvasContextProps(ctx, "fillStyle", "textAlign")
         }
     }
 
     export class Entity extends BaseEntity {
-        private readonly minWidth = 100
+        private readonly minWidth = 125
         private readonly minAttributesHeight = 65
         private readonly attributeHeight  = 20
         private readonly firstAttributeOffset = 5
@@ -235,31 +238,6 @@ export namespace CrowsFootNotation {
                 "attributes",
                 new Rectangle(x, y + this.headerHeight, this.minWidth, this.minAttributesHeight),
             )
-        }
-
-        private RenderHeader(this: Entity, ctx: CanvasRenderingContext2D) {
-            const [headerTextPos] = this.header.GetTextPosition()
-
-            ctx.fillStyle = "white"
-            this.header.shape.Render(ctx)
-
-            ctx.fillStyle = "black"
-            ctx.textAlign = "center"
-            ctx.fillText(this.header.GetText(), headerTextPos.x, headerTextPos.y, this.GetWidth())
-
-            resetCanvasContextProps(ctx)
-        }
-
-        private RenderAttributes(this: Entity, ctx: CanvasRenderingContext2D) {
-            ctx.fillStyle = "white"
-            this.attributesContainer.shape.Render(ctx)
-
-            // TODO: use partial reset
-            ctx.fillStyle = "black"
-
-            for (const attribute of this.attributes) {
-                attribute.Render(ctx)
-            }
         }
 
         override SetName(this: Entity, name: string) {
@@ -305,7 +283,7 @@ export namespace CrowsFootNotation {
             this.attributesContainer.shape.Render(ctx, ShapeRenderMode.OutlineOnly)
             this.header.shape.Render(ctx, ShapeRenderMode.OutlineOnly)
 
-            resetCanvasContextProps(ctx)
+            resetCanvasContextProps(ctx, "fillStyle", "strokeStyle")
         }
 
         GetInteractedPart(this: Entity, p: Point): Optional<EntityPart<Rectangle>> {
@@ -372,7 +350,7 @@ export namespace CrowsFootNotation {
 
             ctx.fillRect(partTextPos.x, partTextPos.y, textWidth, fontHeight + 2)
 
-            resetCanvasContextProps(ctx)
+            resetCanvasContextProps(ctx, "globalAlpha", "fillStyle")
         }
 
         GetSelectedAttribute(this: Entity): Optional<EntityAttribute> {
@@ -411,6 +389,30 @@ export namespace CrowsFootNotation {
         DetachAllRelationships(this: Entity): void {
             for (const attribute of this.attributes) {
                 attribute.DetachAllRelationships()
+            }
+        }
+
+        private RenderHeader(this: Entity, ctx: CanvasRenderingContext2D) {
+            const [headerTextPos] = this.header.GetTextPosition()
+
+            ctx.fillStyle = "white"
+            this.header.shape.Render(ctx)
+
+            ctx.fillStyle = "black"
+            ctx.textAlign = "center"
+            ctx.fillText(this.header.GetText(), headerTextPos.x, headerTextPos.y, this.GetWidth())
+
+            resetCanvasContextProps(ctx, "fillStyle", "textAlign")
+        }
+
+        private RenderAttributes(this: Entity, ctx: CanvasRenderingContext2D) {
+            ctx.fillStyle = "white"
+            this.attributesContainer.shape.Render(ctx)
+
+            resetCanvasContextProps(ctx, "fillStyle")
+
+            for (const attribute of this.attributes) {
+                attribute.Render(ctx)
             }
         }
     }
@@ -456,6 +458,29 @@ export namespace CrowsFootNotation {
         private readonly typeMarkerOffset: number = 15
         private readonly markerWidth: number = 15
 
+        override Render(ctx: CanvasRenderingContext2D) {
+            if (!this.firstParticipant || !this.secondParticipant) {
+                return
+            }
+
+            super.Render(ctx)
+
+            // TODO: calc direction instead of hardcoding
+            this.renderRelationType(
+                ctx,
+                this.firstParticipant.GetRelationType(),
+                RelationDirection.Left,
+                this.firstParticipant.GetPosition(),
+            )
+
+            this.renderRelationType(
+                ctx,
+                this.secondParticipant.GetRelationType(),
+                RelationDirection.Right,
+                this.secondParticipant.GetPosition(),
+            )
+        }
+
         private renderRelationType(
             this: Relationship,
             ctx: CanvasRenderingContext2D,
@@ -496,31 +521,8 @@ export namespace CrowsFootNotation {
             }
 
             ctx.stroke()
-        }
 
-        override Render(ctx: CanvasRenderingContext2D) {
-            if (!this.firstParticipant || !this.secondParticipant) {
-                return
-            }
-
-            super.Render(ctx)
-
-            // TODO: calc direction instead of hardcoding
-            this.renderRelationType(
-                ctx,
-                this.firstParticipant.GetRelationType(),
-                RelationDirection.Left,
-                this.firstParticipant.GetPosition(),
-            )
-
-            this.renderRelationType(
-                ctx,
-                this.secondParticipant.GetRelationType(),
-                RelationDirection.Right,
-                this.secondParticipant.GetPosition(),
-            )
-
-            resetCanvasContextProps(ctx)
+            resetCanvasContextProps(ctx, "lineWidth", "fillStyle")
         }
     }
 }

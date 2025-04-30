@@ -1,0 +1,17 @@
+.tools-menu {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  width: 100px;
+  z-index: 1;
+
+  &__button {
+    background-color: var(--color-accent);
+
+    &:hover {
+      background-color: var(--color-accent-hover);
+    }
+  }
+}

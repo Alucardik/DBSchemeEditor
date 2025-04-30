@@ -46,11 +46,11 @@ export class RelationshipParticipant<RT extends any> {
 
 export class BaseRelationship<RT extends any> {
     private static counter: number = 0
+    protected firstParticipant: Optional<RelationshipParticipant<RT>> = null
+    protected secondParticipant: Optional<RelationshipParticipant<RT>> = null
     private readonly id: number
     private readonly lineWidth: number = 2
     private readonly interactionRadius: number = 3
-    protected firstParticipant: Optional<RelationshipParticipant<RT>> = null
-    protected secondParticipant: Optional<RelationshipParticipant<RT>> = null
 
     constructor() {
         this.id = BaseRelationship.counter
@@ -193,7 +193,7 @@ export class BaseRelationship<RT extends any> {
             ctx.stroke()
         }
 
-        resetCanvasContextProps(ctx)
+        resetCanvasContextProps(ctx, "lineWidth", "lineCap", "strokeStyle")
     }
 
     IsInteracted(this: BaseRelationship<RT>, p: Point): boolean {

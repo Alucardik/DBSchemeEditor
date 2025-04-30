@@ -12,15 +12,6 @@ export class Cursor {
     private editedString: string = ""
     private wholeTextSelected: boolean = true
 
-    private MoveLetterIndex(this: Cursor, delta: number) {
-        this.letterIndex += delta
-        this.letterIndex = Math.max(0, this.letterIndex)
-
-        if (this.editedString.length > 0) {
-            this.letterIndex = Math.min(this.letterIndex, this.editedString.length)
-        }
-    }
-
     IsUnset(this: Cursor) {
         return this.letterIndex === -1
     }
@@ -115,6 +106,15 @@ export class Cursor {
         this.visible ? ctx.fillStyle = "black" : ctx.fillStyle = "transparent"
         // TODO: parse font height
         ctx.fillRect(this.position.x, this.position.y, 1, 10)
-        resetCanvasContextProps(ctx)
+        resetCanvasContextProps(ctx, "fillStyle")
+    }
+
+    private MoveLetterIndex(this: Cursor, delta: number) {
+        this.letterIndex += delta
+        this.letterIndex = Math.max(0, this.letterIndex)
+
+        if (this.editedString.length > 0) {
+            this.letterIndex = Math.min(this.letterIndex, this.editedString.length)
+        }
     }
 }

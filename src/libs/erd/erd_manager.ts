@@ -5,10 +5,55 @@ import { Point } from "@/libs/render/shapes"
 import { Optional } from "@/libs/utils/types"
 
 export default class ERDManager {
+    private static instance: ERDManager
+
     // TODO: save entities, relationships and current notation to local storage and upload from there on startup
     private entities: BaseEntity[] = []
     private relationships: BaseRelationship<any>[] = []
     private notationName: string = CrowsFootNotation.GetNotationName()
+    private schemeName: string = "test_scheme"
+
+    private constructor() {}
+
+    static GetInstance(): ERDManager {
+        if (!ERDManager.instance) {
+            ERDManager.instance = new ERDManager()
+        }
+
+        return this.instance
+    }
+
+    ExportScheme(this: ERDManager): string {
+        // TODO: use msgpack or something similar
+        return JSON.stringify({
+            entities: JSON.stringify(this.entities),
+            relationships: JSON.stringify(this.relationships),
+            notation: this.notationName,
+        })
+    }
+
+    ImportScheme(this: ERDManager, scheme: string) {
+        const structuredScheme = JSON.parse(scheme) as {entities: string, relationships: string, notation: string}
+
+        switch (structuredScheme.notation) {
+            case CrowsFootNotation.GetNotationName():
+                this.entities = JSON.parse(structuredScheme.entities) as CrowsFootNotation.Entity[]
+                this.relationships = JSON.parse(structuredScheme.relationships) as CrowsFootNotation.Relationship[]
+                break
+            default:
+                throw Error(`Unknown scheme "${structuredScheme.notation}"`)
+        }
+
+        this.notationName = structuredScheme.notation
+    }
+
+    SetSchemeName(this: ERDManager, schemeName: string) {
+        this.schemeName = schemeName
+    }
+
+    GetSchemeName(this: ERDManager): string {
+        return this.schemeName
+    }
 
     GetNotationName(this: ERDManager) {
         return this.notationName

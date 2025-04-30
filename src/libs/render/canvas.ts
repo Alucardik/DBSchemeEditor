@@ -1,32 +1,49 @@
-// TODO: support partial props resets
-function resetCanvasContextProps(ctx: CanvasRenderingContext2D) {
-    ctx.direction = "inherit"
-    ctx.fillStyle = "#000"
-    ctx.filter = "none"
-    ctx.font = "10px sans-serif"
-    ctx.fontKerning = "auto"
-    ctx.fontStretch = "normal"
-    ctx.fontVariantCaps = "normal"
-    ctx.globalAlpha = 1
-    ctx.globalCompositeOperation = "source-over"
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = "low"
-    // TODO: choose another font and letter spacing
-    ctx.letterSpacing = "0px"
-    ctx.lineCap = "butt"
-    ctx.lineDashOffset = 0
-    ctx.lineJoin = "miter"
-    ctx.lineWidth = 1
-    ctx.miterLimit = 10
-    ctx.shadowBlur = 0
-    ctx.shadowColor = "#00000000"
-    ctx.shadowOffsetX = 0
-    ctx.shadowOffsetY = 0
-    ctx.strokeStyle = "#000"
-    ctx.textAlign = "start"
-    ctx.textBaseline = "alphabetic"
-    ctx.textRendering = "auto"
-    ctx.wordSpacing = "0px"
+const defaultRenderingContext2DValues = {
+    direction:  "inherit",
+    fillStyle:  "#000",
+    filter: "none",
+    font: "10px sans-serif",
+    fontKerning: "auto",
+    fontStretch: "normal",
+    fontVariantCaps: "normal",
+    globalAlpha: 1,
+    globalCompositeOperation: "source-over",
+    imageSmoothingEnabled: true,
+    imageSmoothingQuality: "low",
+    letterSpacing: "0px",
+    lineCap: "butt",
+    lineDashOffset: 0,
+    lineJoin: "miter",
+    lineWidth: 1,
+    miterLimit: 10,
+    shadowBlur: 0,
+    shadowColor: "#00000000",
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    strokeStyle: "#000",
+    textAlign: "start",
+    textBaseline: "alphabetic",
+    textRendering: "auto",
+    wordSpacing: "0px",
+}
+
+function resetCanvasContextProps(ctx: CanvasRenderingContext2D, ...props: string[]) {
+    // reset all props by default
+    if (props.length === 0) {
+        for (const [key, value] of Object.entries(defaultRenderingContext2DValues)) {
+            // @ts-ignore
+            ctx[key] = value
+        }
+
+        return
+    }
+
+    for (const prop of props) {
+        if (prop in defaultRenderingContext2DValues) {
+            // @ts-ignore
+            ctx[prop] = defaultRenderingContext2DValues[prop]
+        }
+    }
 }
 
 export {

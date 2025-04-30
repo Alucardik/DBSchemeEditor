@@ -26,9 +26,7 @@ export default function WidgetsMenu() {
             firstRelationTypeOptions.push((<option key={relationType} value={relationType}>{CrowsFootNotation.RelationTypeToString(relationType)}</option>))
             secondRelationTypeOptions.push((<option key={relationType} value={relationType}>{CrowsFootNotation.RelationTypeToString(relationType)}</option>))
         }
-
-        // TODO: hide options behind list for first and second participants
-        //  and form it dynamically
+        
         return (
             <div className={styles["widgets-menu"]+" "+styles["widgets-menu_centered"]} style={{
                 left:  Math.min(firstPos.x, secondPos.x) + Math.abs(firstPos.x - secondPos.x) / 2 - canvasOffset.x,

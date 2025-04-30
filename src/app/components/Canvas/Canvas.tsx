@@ -37,7 +37,7 @@ export default function Canvas() {
     const canvasRef = useRef(null) as unknown as RefObject<HTMLCanvasElement>
     const cursor = new Cursor()
     const editModeManager = new EditModeManager()
-    const erdManager = new ERDManager()
+    const erdManager = ERDManager.GetInstance()
 
     let ctx: CanvasRenderingContext2D = new CanvasRenderingContext2DStub()
     let lastMouseDownTimestamp = 0
@@ -390,6 +390,12 @@ export default function Canvas() {
 
     useEffect(() => {
         ctx = canvasRef.current.getContext("2d") as CanvasRenderingContext2D
+
+        // setting default font for the rest of the renders once the fonts are loaded
+        document.fonts.ready.then(() => {
+            ctx.font = '12px "OpenSans", "Arial", sans-serif'
+        })
+
         resizeCanvasToScreen()
 
         window.addEventListener("resize", resizeCanvasToScreen)
