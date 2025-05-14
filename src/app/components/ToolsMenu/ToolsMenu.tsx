@@ -6,8 +6,7 @@ export default function ToolsMenu() {
     const erdManager = ERDManager.GetInstance()
 
     const handleOnClick = () => {
-        const scheme = erdManager.ExportScheme()
-        localStorage.setItem(erdManager.GetSchemeName(), scheme)
+        localStorage.setItem(erdManager.GetSchemeExportID(), erdManager.ExportScheme())
     }
 
     return (
@@ -17,6 +16,18 @@ export default function ToolsMenu() {
                 onClick={handleOnClick}
             >
                 Save Scheme
+            </button>
+            <button
+                className={styles["tools-menu__button"]}
+                onClick={handleOnClick}
+            >
+                Generate SQL
+            </button>
+            <button
+                className={styles["tools-menu__button"]}
+                onClick={handleOnClick}
+            >
+                Deploy to DB
             </button>
         </div>
     )

@@ -1,9 +1,10 @@
 .tools-menu {
-  position: absolute;
   bottom: 20px;
-  left: 20px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  left: 20px;
+  position: absolute;
   width: 100px;
   z-index: 1;
 

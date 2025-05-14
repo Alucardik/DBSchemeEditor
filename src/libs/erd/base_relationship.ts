@@ -19,6 +19,16 @@ export class RelationshipParticipant<RT extends any> {
         this.relationType = relationType
     }
 
+    static FromJSON<RT extends any>(obj: RelationshipParticipant<RT>, attrShape: Shape): RelationshipParticipant<RT> {
+        const ret = new RelationshipParticipant<RT>(null)
+        Object.assign(ret, obj)
+
+        ret.position = new Point(obj.position.x, obj.position.y)
+        ret.attribute = BaseEntityAttribute.FromJSON(obj.attribute, attrShape)
+
+        return ret
+    }
+
     SetPosition(this: RelationshipParticipant<RT>, position: Point): void {
         this.position = position
     }

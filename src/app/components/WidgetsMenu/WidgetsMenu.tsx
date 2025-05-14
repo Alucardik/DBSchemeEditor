@@ -88,7 +88,7 @@ export default function WidgetsMenu() {
         const modifierOptions = []
 
         for (const modifier of CrowsFootNotation.GetAvailableModifierTypes()) {
-            modifierOptions.push((<option key={modifier} value={modifier}>{modifier}</option>))
+            modifierOptions.push((<option key={modifier} value={modifier} style={{userSelect: "none"}}>{modifier}</option>))
         }
 
         return (
@@ -110,7 +110,7 @@ export default function WidgetsMenu() {
                 }}>
                     Add Attribute
                 </button>
-                <label style={{display: modifierListVisible}}>
+                <label style={{display: modifierListVisible, userSelect: "none"}}>
                     Modifiers
                     <select
                         className={styles["widgets-menu__list"]}

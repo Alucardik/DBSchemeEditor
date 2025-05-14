@@ -3,6 +3,7 @@ import { BaseRelationship } from "@/libs/erd/base_relationship"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
 import { Point } from "@/libs/render/shapes"
 import { Optional } from "@/libs/utils/types"
+import { v4 as uuidv4, validate as validateUUID } from "uuid"
 
 export default class ERDManager {
     private static instance: ERDManager
@@ -11,6 +12,7 @@ export default class ERDManager {
     private entities: BaseEntity[] = []
     private relationships: BaseRelationship<any>[] = []
     private notationName: string = CrowsFootNotation.GetNotationName()
+    private schemeID: string = ""
     private schemeName: string = "test_scheme"
 
     private constructor() {}
@@ -23,32 +25,63 @@ export default class ERDManager {
         return this.instance
     }
 
+    static CheckSchemeExportID(exportID: string): boolean {
+        const parts = exportID.split("_")
+        if (parts.length != 3) {
+            return false
+        }
+
+        return parts[0] === "erd" && validateUUID(parts[1])
+    }
+
+    Clear(this: ERDManager): void {
+        this.entities = []
+        this.relationships = []
+    }
+
+    GetSchemeExportID(this: ERDManager): string {
+        return ["erd", this.schemeID, this.schemeName].join("_")
+    }
+
     ExportScheme(this: ERDManager): string {
         // TODO: use msgpack or something similar
         return JSON.stringify({
-            entities: JSON.stringify(this.entities),
-            relationships: JSON.stringify(this.relationships),
+            entities: this.entities.map((entity) => entity.ToJSON()),
+            relationships: this.relationships,
             notation: this.notationName,
+            schemeID: this.schemeID,
+            schemeName: this.schemeName,
         })
     }
 
     ImportScheme(this: ERDManager, scheme: string) {
-        const structuredScheme = JSON.parse(scheme) as {entities: string, relationships: string, notation: string}
+        const structuredScheme = JSON.parse(scheme) as {
+            entities: object[],
+            relationships: object[],
+            notation: string,
+            schemeID: string,
+            schemeName: string,
+        }
 
         switch (structuredScheme.notation) {
             case CrowsFootNotation.GetNotationName():
-                this.entities = JSON.parse(structuredScheme.entities) as CrowsFootNotation.Entity[]
-                this.relationships = JSON.parse(structuredScheme.relationships) as CrowsFootNotation.Relationship[]
+                this.entities = structuredScheme.entities.map((entity: object) => CrowsFootNotation.Entity.FromJSON(entity)) as CrowsFootNotation.Entity[]
+                this.relationships = structuredScheme.relationships.map((relation: object) => CrowsFootNotation.Relationship.FromJSON(relation)) as CrowsFootNotation.Relationship[]
                 break
             default:
                 throw Error(`Unknown scheme "${structuredScheme.notation}"`)
         }
 
         this.notationName = structuredScheme.notation
+        this.schemeID = structuredScheme.schemeID
+        this.schemeName = structuredScheme.schemeName
     }
 
-    SetSchemeName(this: ERDManager, schemeName: string) {
+    InitNewScheme(this: ERDManager, schemeName: string, notationName: string): void {
+        this.schemeID = uuidv4()
         this.schemeName = schemeName
+        this.notationName = notationName
+        this.Clear()
     }
 
     GetSchemeName(this: ERDManager): string {

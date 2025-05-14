@@ -31,6 +31,7 @@ html {
 }
 
 body {
+    display: flex;
     height: 100%;
     margin: 0;
     padding: 0;
@@ -61,4 +62,10 @@ input, button {
     outline: none;
     font-size: inherit;
     font-family: inherit;
+}
+
+ul, ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }

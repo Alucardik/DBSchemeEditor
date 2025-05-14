@@ -28,6 +28,16 @@ export namespace CrowsFootNotation {
     class EntityRelationConnector extends Ellipse {
         private isActive: boolean = false
 
+        static FromJSON(obj: EntityRelationConnector): EntityRelationConnector {
+            const ret = new EntityRelationConnector()
+            ret.center = new Point(obj.center.x, obj.center.y)
+            ret.xRadius = obj.xRadius
+            ret.yRadius = obj.yRadius
+            ret.isActive = obj.isActive
+
+            return ret
+        }
+
         SetActive(this: EntityRelationConnector): void {
             this.isActive = true
         }
@@ -53,6 +63,7 @@ export namespace CrowsFootNotation {
         private relationConnectors: [EntityRelationConnector, EntityRelationConnector]
         private modifier: ModifierType = ModifierType.None
         // FIXME: multiple relationships work incorrectly
+        // FIXME: convert to object when marshalling (Object.fromEntries(map.entries())
         private associatedRelationships: Map<number, [Relationship, number]> = new Map()
 
         constructor(name: string, rectangle: Rectangle, text: string = "") {
@@ -61,6 +72,32 @@ export namespace CrowsFootNotation {
                 new EntityRelationConnector(new Point(-1, -1), this.relationConnectorRadius, this.relationConnectorRadius),
                 new EntityRelationConnector(new Point(-1, -1), this.relationConnectorRadius, this.relationConnectorRadius),
             ]
+        }
+
+        static override FromJSON(obj: EntityAttribute): EntityAttribute {
+            const rectangle = Object.assign(new Rectangle(), obj.shape)
+            rectangle.topLeftCorner = new Point(obj.shape.topLeftCorner.x, obj.shape.topLeftCorner.y)
+
+            const entityAttribute = Object.assign(new EntityAttribute("", rectangle), obj)
+            // @ts-ignore
+            entityAttribute.shape = rectangle
+            // @ts-ignore
+            entityAttribute.relationConnectors = entityAttribute.relationConnectors.map((obj) => EntityRelationConnector.FromJSON(obj))
+            // FIXME: unmarhsal relationships
+            entityAttribute.associatedRelationships = new Map()
+
+            for (const [key, [rawRelation, number]] of Object.entries(obj.associatedRelationships)) {
+                entityAttribute.associatedRelationships.set(key, [Relationship.FromJSON(rawRelation), number])
+            }
+
+            return entityAttribute
+        }
+
+        ToJSON(this: EntityAttribute): object {
+            const obj = Object.assign({}, this)
+            obj.associatedRelationships = Object.fromEntries(this.associatedRelationships.entries())
+
+            return obj
         }
 
         GetModifierType(this: EntityAttribute): ModifierType {
@@ -238,6 +275,36 @@ export namespace CrowsFootNotation {
                 "attributes",
                 new Rectangle(x, y + this.headerHeight, this.minWidth, this.minAttributesHeight),
             )
+        }
+
+        static FromJSON(rawEntity: Entity): Entity {
+            const headerPositionGetter =                 (r: Rectangle) => [r.GetPivotPoint().Translate(
+                r.width / 2,
+                r.height / 2,
+            ), true] as [Point, boolean]
+
+            const headerShape = Object.assign(new Rectangle(), rawEntity.header.shape)
+            const attributesContainerShape = Object.assign(new Rectangle(), rawEntity.attributesContainer.shape)
+
+            headerShape.topLeftCorner = new Point(rawEntity.header.shape.topLeftCorner.x, rawEntity.header.shape.topLeftCorner.y)
+            attributesContainerShape.topLeftCorner = new Point(rawEntity.attributesContainer.shape.topLeftCorner.x, rawEntity.attributesContainer.shape.topLeftCorner.y)
+
+            const entity = Object.assign(new Entity(""), rawEntity)
+
+            entity.header.GetTextPosition = () => headerPositionGetter(headerShape)
+            entity.header = EntityPart.FromJSON(entity.header, headerShape)
+            entity.attributes = rawEntity.attributes.map((obj) => EntityAttribute.FromJSON(obj))
+            entity.attributesContainer = EntityPart.FromJSON(entity.attributesContainer, attributesContainerShape)
+            entity.selectedPart = null
+
+            return entity
+        }
+
+        ToJSON(this: Entity): object {
+            const obj = Object.assign({}, this)
+            obj.attributes = this.attributes.map((attribute) => attribute.ToJSON())
+
+            return obj
         }
 
         override SetName(this: Entity, name: string) {
@@ -457,6 +524,17 @@ export namespace CrowsFootNotation {
         private readonly mandatoryMarkerOffset: number = 25
         private readonly typeMarkerOffset: number = 15
         private readonly markerWidth: number = 15
+
+        static FromJSON(obj: Relationship): Relationship {
+            const ret = new Relationship()
+            Object.assign(ret, obj)
+
+            // FIXME: link to existing attributes instead of creating a new one (breaks relationships)
+            ret.firstParticipant = RelationshipParticipant.FromJSON(obj.firstParticipant, new Rectangle())
+            ret.secondParticipant = RelationshipParticipant.FromJSON(obj.secondParticipant, new Rectangle())
+
+            return ret
+        }
 
         override Render(ctx: CanvasRenderingContext2D) {
             if (!this.firstParticipant || !this.secondParticipant) {

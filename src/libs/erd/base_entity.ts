@@ -7,10 +7,8 @@ export type TextPositionGetter<S extends Shape> = (s: S) => [Point, boolean]
 export class EntityPart<S extends Shape> {
     readonly name: string
     readonly shape: S
-
-    private text: string
     // TODO: maybe save styles here instead of the whole entity
-
+    private text: string
     constructor(
         name: string,
         shape: S,
@@ -21,6 +19,13 @@ export class EntityPart<S extends Shape> {
         this.shape = shape
         this.text = text
         this.GetTextPosition = (): [Point, boolean] => textPositionGetter(this.shape)
+    }
+
+    static FromJSON<S extends Shape>(obj: EntityPart<S>, s: S): EntityPart<S> {
+        const entityPart = Object.assign(new EntityPart("", s), obj)
+        entityPart.shape = s
+
+        return entityPart
     }
 
     GetText(this: EntityPart<S>): string {
@@ -69,6 +74,8 @@ export abstract class BaseEntity {
     SetName(name: string){
         this.name = name
     }
+
+    abstract ToJSON(this: BaseEntity): string
 
     abstract AddAttribute(attributeName: string, ...extraArgs: any[]): void
 

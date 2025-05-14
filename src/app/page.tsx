@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import MainMenu from "@/app/components/MainMenu/MainMenu"
 
 export default function Home() {
-    redirect("/editor")
+    return (<MainMenu />)
 }

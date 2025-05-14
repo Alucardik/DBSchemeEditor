@@ -45,7 +45,12 @@ class Rectangle implements Shape {
     width: number
     height: number
 
-    constructor(topLeftCornerX: number, topLeftCornerY: number, width: number, height: number) {
+    constructor(
+        topLeftCornerX: number = 0,
+        topLeftCornerY: number = 0,
+        width: number = 0,
+        height: number = 0,
+    ) {
         this.topLeftCorner = new Point(topLeftCornerX, topLeftCornerY)
         this.width = width
         this.height = height
@@ -76,7 +81,7 @@ class Ellipse implements Shape {
     xRadius: number
     yRadius: number
 
-    constructor(center: Point, xRadius: number, yRadius: number) {
+    constructor(center: Point = new Point(0, 0), xRadius: number = 0, yRadius: number = 0) {
         this.center = center
         this.xRadius = xRadius
         this.yRadius = yRadius
