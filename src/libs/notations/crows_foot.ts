@@ -83,7 +83,6 @@ export namespace CrowsFootNotation {
             entityAttribute.shape = rectangle
             // @ts-ignore
             entityAttribute.relationConnectors = entityAttribute.relationConnectors.map((obj) => EntityRelationConnector.FromJSON(obj))
-            // FIXME: unmarhsal relationships
             entityAttribute.associatedRelationships = new Map()
 
             for (const [key, [rawRelation, number]] of Object.entries(obj.associatedRelationships)) {
