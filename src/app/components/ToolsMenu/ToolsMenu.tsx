@@ -7,7 +7,9 @@ import styles from './ToolsMenu.module.scss'
 export default function ToolsMenu() {
     const erdManager = ERDManager.GetInstance()
     const [isPopupHidden, setPopupHidden] = useState(true)
+    const [isDeployPopupHidden, setDeployPopupHidden] = useState(true)
     const [sqlQuery, setSQLQuery] = useState("")
+    const [deployStatus, setDeployStatus] = useState("")
 
     const handleSaveOnClick = () => {
         localStorage.setItem(erdManager.GetSchemeExportID(), erdManager.ExportScheme())
@@ -30,9 +32,27 @@ export default function ToolsMenu() {
         console.error("Failed to generate sql", message)
     }
 
+    const handleOnDeployToDBClick = async () => {
+        const resp = await fetch("/api/scheme/apply", {
+            method: "POST",
+            body: JSON.stringify(erdManager.ConvertToServerScheme())
+        })
+
+        if (resp.ok) {
+            setDeployStatus("Scheme successfully deployed")
+            setDeployPopupHidden(false)
+            return
+        }
+
+        const { message } = await resp.json()
+        setDeployStatus("Error deploying scheme: " + message)
+        setDeployPopupHidden(false)
+    }
+
     return (
         <>
-            <PopupText isHidden={isPopupHidden} listHeading={"SQL Script"} text={sqlQuery} onCloseHandler={() => setPopupHidden(true)} />
+            <PopupText isHidden={isPopupHidden} listHeading={"Generated SQL-Script"} text={sqlQuery} onCloseHandler={() => setPopupHidden(true)} />
+            <PopupText isHidden={isDeployPopupHidden} listHeading={deployStatus} text={""} onCloseHandler={() => setDeployPopupHidden(true)} />
             <div className={styles["tools-menu"]}>
                 <button
                     className={styles["tools-menu__button"]}
@@ -48,7 +68,7 @@ export default function ToolsMenu() {
                 </button>
                 <button
                     className={styles["tools-menu__button"]}
-                    onClick={handleSaveOnClick}
+                    onClick={handleOnDeployToDBClick}
                 >
                     Deploy to DB
                 </button>
