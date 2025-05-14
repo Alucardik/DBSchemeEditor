@@ -1,3 +1,5 @@
+import { Attribute, AttributeConstraint, AttributeType } from "@/app/models/attributes"
+import { Entity, Relationship, RelationshipDestination, Scheme } from "@/app/models/scheme"
 import { BaseEntity } from "@/libs/erd/base_entity"
 import { BaseRelationship } from "@/libs/erd/base_relationship"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
@@ -52,6 +54,60 @@ export default class ERDManager {
             schemeID: this.schemeID,
             schemeName: this.schemeName,
         })
+    }
+
+    ConvertToServerScheme(this: ERDManager): Scheme {
+        const ret = new Scheme()
+        ret.relationships = this.relationships.map((relationShip) => {
+            const rel = new Relationship()
+
+            rel.from = new RelationshipDestination()
+            const fromAttr = relationShip.GetFirstParticipant()?.GetEntityAttribute()
+            const toAttr = relationShip.GetSecondParticipant()?.GetEntityAttribute()
+
+            rel.from.attributeName = fromAttr?.GetText() || ""
+            rel.from.entityName = this.entities.find((entity) => {
+                return entity.GetAttributes().findIndex((attribute) => attribute === fromAttr) !== -1
+            })?.GetName() || ""
+
+            rel.to.attributeName = toAttr?.GetText() || ""
+            rel.to.entityName = this.entities.find((entity) => {
+                return entity.GetAttributes().findIndex((attribute) => attribute === toAttr) !== -1
+            })?.GetName() || ""
+
+            return rel
+        })
+
+        ret.entities = this.entities.map((entity) => {
+            const ent = new Entity()
+            ent.name = entity.GetName()
+            ent.attributes = entity.GetAttributes().map((attribute) => {
+                const attr = new Attribute()
+
+                attr.name = attribute.GetText()
+                // FIXME: start using attribute types
+                attr.type = AttributeType.Integer
+                attr.constraints = []
+
+                if (attribute instanceof CrowsFootNotation.EntityAttribute) {
+                    const modifierType = (attribute as CrowsFootNotation.EntityAttribute).GetModifierType()
+                    switch (modifierType) {
+                        case CrowsFootNotation.ModifierType.PrimaryKey:
+                            attr.constraints.push(AttributeConstraint.PrimaryKey)
+                            break
+                        case CrowsFootNotation.ModifierType.ForeignKey:
+                            attr.constraints.push(AttributeConstraint.ForeignKey)
+                            break
+                    }
+                }
+
+                return attr
+            })
+
+            return ent
+        })
+
+        return ret
     }
 
     ImportScheme(this: ERDManager, scheme: string) {

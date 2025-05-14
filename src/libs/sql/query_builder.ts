@@ -84,21 +84,70 @@ export class QueryBuilder {
         }
 
         const queryParts = [] as string[]
-        for (const entity of this.scheme.entities) {
-            const [table, err] = this.CreateTableQuery(entity.name, entity.attributes)
-            if (err !== null) {
+        const foreignKeyPairs = [] as [number, number[]][]
+
+        for (const [index, entity] of this.scheme.entities.entries()) {
+            const [table, foreignKeyIndexes, err] = this.CreateTableQuery(entity.name, entity.attributes)
+            if (err) {
                 return ["", err]
+            }
+
+            if (foreignKeyIndexes.length > 0) {
+                foreignKeyPairs.push([index, foreignKeyIndexes])
             }
 
             queryParts.push(table)
         }
 
+        for (const relationship of this.scheme.relationships) {
+            const firstEntity = this.scheme.entities.find((entity) => entity.name === relationship.from.entityName)
+            if (!firstEntity) {
+                continue
+            }
+
+            const firstAttr = firstEntity.attributes.find((attribute) => attribute.name === relationship.from.attributeName)
+            if (!firstAttr) {
+                continue
+            }
+
+            const secondEntity = this.scheme.entities.find((entity) => entity.name === relationship.to.entityName)
+            if (!secondEntity) {
+                continue
+            }
+
+            const secondAttr = secondEntity.attributes.find((attribute) => attribute.name === relationship.to.attributeName)
+            if (!secondAttr) {
+                continue
+            }
+
+            try {
+                const res = format("ALTER TABLE %I ADD CONSTRAINT %I FOREIGN KEY(%I) REFERENCES %I (%I);",
+                    relationship.from.entityName,
+                    ["fk", relationship.from.entityName, relationship.from.attributeName, "to", relationship.to.entityName, relationship.to.attributeName].join("_"),
+                    relationship.from.attributeName,
+                    relationship.to.entityName,
+                    relationship.to.attributeName,
+                )
+                queryParts.push(res)
+            } catch (e) {
+                return ["", e]
+            }
+        }
+
+        // maybe add additional foreign key validation
+        // for (const [entityIndex, foreignKeyIndexes] of foreignKeyPairs) {
+        //     for (const attrIndex of foreignKeyIndexes) {
+        //         this.scheme.entities[entityIndex].attributes[attrIndex].
+        //     }
+        // }
+
         return [queryParts.join("\n"), null]
     }
 
-    private CreateTableQuery(this: QueryBuilder, tableName: string, attributes: Attribute[]): [string, Optional<Error>] {
+    private CreateTableQuery(this: QueryBuilder, tableName: string, attributes: Attribute[]): [string, number[], Optional<Error>] {
         const queryParts = ["CREATE TABLE %I ("] as string[]
         const queryArgs = [tableName]
+        const foreignKeyIndexes = [] as number[]
 
         for (const [index, attribute] of attributes.entries()) {
             let attrQuery = "%I "
@@ -127,6 +176,9 @@ export class QueryBuilder {
                     case AttributeConstraint.PrimaryKey:
                         attrQuery += " PRIMARY KEY"
                         break
+                    case AttributeConstraint.ForeignKey:
+                        foreignKeyIndexes.push(index)
+                        break
                 }
             }
 
@@ -142,10 +194,10 @@ export class QueryBuilder {
 
         try {
             const res = format(queryParts.join("\n"), ...queryArgs)
-            return [res, null]
+            return [res, foreignKeyIndexes, null]
         } catch (e) {
             // @ts-ignore
-            return ["", e]
+            return ["", foreignKeyIndexes, e]
         }
     }
 

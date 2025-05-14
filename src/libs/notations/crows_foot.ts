@@ -57,7 +57,7 @@ export namespace CrowsFootNotation {
         }
     }
 
-    class EntityAttribute extends BaseEntityAttribute<Rectangle> {
+    export class EntityAttribute extends BaseEntityAttribute<Rectangle> {
         private readonly relationConnectorRadius: number = 3
         private readonly modifierOffset = 15
         private relationConnectors: [EntityRelationConnector, EntityRelationConnector]
@@ -306,6 +306,11 @@ export namespace CrowsFootNotation {
             return obj
         }
 
+        // FIXME: set original entity name or remove name from base entity
+        override GetName(this: Entity): string {
+            return this.header.GetText()
+        }
+
         override SetName(this: Entity, name: string) {
             super.SetName(name)
             this.header.SetText(name)
@@ -325,6 +330,10 @@ export namespace CrowsFootNotation {
                 ),
                 attributeName,
             ))
+        }
+
+        GetAttributes(this: Entity): EntityAttribute[] {
+            return this.attributes
         }
 
         GetPosition(): Point {

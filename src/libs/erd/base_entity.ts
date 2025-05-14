@@ -63,11 +63,11 @@ export abstract class BaseEntity {
         BaseEntity.counter++
     }
 
-    GetID(this: BaseEntity) {
+    GetID() {
         return this.id
     }
 
-    GetName(this: BaseEntity) {
+    GetName() {
         return this.name
     }
 
@@ -75,9 +75,11 @@ export abstract class BaseEntity {
         this.name = name
     }
 
-    abstract ToJSON(this: BaseEntity): string
+    abstract ToJSON(): object
 
     abstract AddAttribute(attributeName: string, ...extraArgs: any[]): void
+
+    abstract GetAttributes(): BaseEntityAttribute<Shape>[]
 
     abstract GetPosition(): Point
 

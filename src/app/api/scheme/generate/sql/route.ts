@@ -23,8 +23,9 @@ export async function POST(req: NextRequest) {
 
     const err = queryBuilder.SetScheme(scheme)
     if (err) {
+        console.error(err)
         return NextResponse.json({
-            message: err,
+            message: err.message,
         }, {
             status: HTTPStatuses.BAD_REQUEST,
         })
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     const [sql, buildErr] = queryBuilder.Build()
     if (buildErr) {
         return NextResponse.json({
-            message: buildErr,
+            message: buildErr.message,
         }, {
             status: HTTPStatuses.BAD_REQUEST,
         })
