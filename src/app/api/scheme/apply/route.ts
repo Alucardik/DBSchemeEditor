@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 
 export async function POST(req: NextRequest) {
-    let rawScheme = ""
+    let rawScheme = {} as Scheme
 
     try {
         rawScheme = await req.json()
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
         })
     }
 
-    const scheme = Object.assign(new Scheme(), rawScheme)
+    const scheme = new Scheme(rawScheme)
     const queryBuilder = new QueryBuilder()
 
     const err = queryBuilder.SetScheme(scheme)

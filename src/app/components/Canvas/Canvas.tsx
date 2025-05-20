@@ -6,7 +6,7 @@ import {
     editedRelationshipChanged,
     enteredEditMode,
     EntityOpType,
-    exitedEntityMode,
+    exitedEditMode,
     relationEditingFinished,
     relationEditingStarted,
     RelationshipOpType
@@ -402,7 +402,7 @@ export default function Canvas() {
         editedEntityChanged.AddListener(handleOnEditedEntityChanged)
         editedRelationshipChanged.AddListener(handleOnEditedRelationshipChanged)
         enteredEditMode.AddListener(handleOnEnterEditMode)
-        exitedEntityMode.AddListener(animateERD)
+        exitedEditMode.AddListener(animateERD)
         relationEditingStarted.AddListener(handleOnRelationEditingStarted)
         relationEditingFinished.AddListener(handleOnRelationEditingFinished)
         notationStore.Set({notation: erdManager.GetNotationName()})
@@ -412,7 +412,7 @@ export default function Canvas() {
             editedEntityChanged.RemoveListener(handleOnEditedEntityChanged)
             editedRelationshipChanged.RemoveListener(handleOnEditedRelationshipChanged)
             enteredEditMode.RemoveListener(handleOnEnterEditMode)
-            exitedEntityMode.RemoveListener(animateERD)
+            exitedEditMode.RemoveListener(animateERD)
             relationEditingStarted.RemoveListener(handleOnRelationEditingStarted)
             relationEditingFinished.RemoveListener(handleOnRelationEditingFinished)
             cancelAnimationFrame(lastFrameID)

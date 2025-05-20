@@ -16,15 +16,15 @@ export class QueryBuilder {
     private scheme: Optional<Scheme> = null
 
     ValidateScheme(this: QueryBuilder, scheme: Scheme): Optional<Error> {
-        const entityNames = new Set(scheme.entities.map((entity) => entity.name))
+        const entityNames = new Set(scheme.tables.map((entity) => entity.name))
 
-        if (entityNames.size !== scheme.entities.length) {
+        if (entityNames.size !== scheme.tables.length) {
             return DuplicateEntities
         }
 
         const attributesMap = new Map<string, Set<string>>()
 
-        for (const entity of scheme.entities) {
+        for (const entity of scheme.tables) {
             const attributeNames = new Set<string>()
 
             for (const attribute of entity.attributes) {
@@ -49,13 +49,13 @@ export class QueryBuilder {
         }
 
         const verifyDestination = (dest: RelationshipDestination): boolean => {
-            const attributes = attributesMap.get(dest.entityName)
+            const attributes = attributesMap.get(dest.tableName)
 
-            if (!attributes) {
+            if (!attributes || dest.attributeNames.length === 0) {
                 return false
             }
 
-            return attributes.has(dest.attributeName)
+            return dest.attributeNames.every(attrName => attributes.has(attrName))
         }
 
         for (const relationship of scheme.relationships) {
@@ -86,7 +86,7 @@ export class QueryBuilder {
         const queryParts = [] as string[]
         const foreignKeyPairs = [] as [number, number[]][]
 
-        for (const [index, entity] of this.scheme.entities.entries()) {
+        for (const [index, entity] of this.scheme.tables.entries()) {
             const [table, foreignKeyIndexes, err] = this.CreateTableQuery(entity.name, entity.attributes)
             if (err) {
                 return ["", err]
@@ -100,33 +100,35 @@ export class QueryBuilder {
         }
 
         for (const relationship of this.scheme.relationships) {
-            const firstEntity = this.scheme.entities.find((entity) => entity.name === relationship.from.entityName)
+            const firstEntity = this.scheme.tables.find((entity) => entity.name === relationship.from.tableName)
             if (!firstEntity) {
                 continue
             }
 
-            const firstAttr = firstEntity.attributes.find((attribute) => attribute.name === relationship.from.attributeName)
+            // FIXME: support multi-part foreign keys (and use set)
+            const firstAttr = firstEntity.attributes.find((attribute) => attribute.name === relationship.from.attributeNames)
             if (!firstAttr) {
                 continue
             }
 
-            const secondEntity = this.scheme.entities.find((entity) => entity.name === relationship.to.entityName)
+            const secondEntity = this.scheme.tables.find((entity) => entity.name === relationship.to.tableName)
             if (!secondEntity) {
                 continue
             }
 
-            const secondAttr = secondEntity.attributes.find((attribute) => attribute.name === relationship.to.attributeName)
+            const secondAttr = secondEntity.attributes.find((attribute) => attribute.name === relationship.to.attributeNames)
             if (!secondAttr) {
                 continue
             }
 
             try {
+                // TODO: check how array substitution works
                 const res = format("ALTER TABLE %I ADD CONSTRAINT %I FOREIGN KEY(%I) REFERENCES %I (%I);",
-                    relationship.from.entityName,
-                    ["fk", relationship.from.entityName, relationship.from.attributeName, "to", relationship.to.entityName, relationship.to.attributeName].join("_"),
-                    relationship.from.attributeName,
-                    relationship.to.entityName,
-                    relationship.to.attributeName,
+                    relationship.from.tableName,
+                    ["fk", relationship.from.tableName, relationship.from.attributeNames, "to", relationship.to.tableName, relationship.to.attributeNames].join("_"),
+                    relationship.from.attributeNames,
+                    relationship.to.tableName,
+                    relationship.to.attributeNames,
                 )
                 queryParts.push(res)
             } catch (e) {

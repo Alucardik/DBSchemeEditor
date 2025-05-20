@@ -1,5 +1,7 @@
 import PopupText from "@/app/components/PopupText/PopupText"
+import { Scheme } from "@/libs/dto/scheme"
 import ERDManager from "@/libs/erd/erd_manager"
+import { HTTPMethod } from "@/libs/http/requests"
 import { useState } from "react"
 
 import styles from './ToolsMenu.module.scss'
@@ -17,7 +19,7 @@ export default function ToolsMenu() {
 
     const handleOnGenerateSQLClick = async () => {
         const resp = await fetch("/api/scheme/generate/sql", {
-            method: "POST",
+            method: HTTPMethod.POST,
             body: JSON.stringify(erdManager.ConvertToServerScheme())
         })
 
@@ -34,7 +36,7 @@ export default function ToolsMenu() {
 
     const handleOnDeployToDBClick = async () => {
         const resp = await fetch("/api/scheme/apply", {
-            method: "POST",
+            method: HTTPMethod.POST,
             body: JSON.stringify(erdManager.ConvertToServerScheme())
         })
 
@@ -47,6 +49,26 @@ export default function ToolsMenu() {
         const { message } = await resp.json()
         setDeployStatus("Error deploying scheme: " + message)
         setDeployPopupHidden(false)
+    }
+
+    const handleOnNormalizeClick = async () => {
+        const resp = await fetch("/api/scheme/normalize", {
+            method: HTTPMethod.POST,
+            body: JSON.stringify(erdManager.ConvertToServerScheme())
+        })
+
+        if (resp.ok) {
+            const { scheme } = await resp.json() as { scheme: Scheme }
+            console.log(scheme)
+            erdManager.ImportFromServerScheme(scheme)
+
+
+            return
+        }
+
+        // TODO: support 422
+        const { violations } = await resp.json()
+        console.error(violations)
     }
 
     return (
@@ -71,6 +93,12 @@ export default function ToolsMenu() {
                     onClick={handleOnDeployToDBClick}
                 >
                     Deploy to DB
+                </button>
+                <button
+                    className={styles["tools-menu__button"]}
+                    onClick={handleOnNormalizeClick}
+                >
+                    Normalize Scheme
                 </button>
             </div>
         </>

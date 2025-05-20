@@ -1,4 +1,4 @@
-import { enteredEditMode, exitedEntityMode, relationEditingFinished } from "@/app/events"
+import { enteredEditMode, exitedEditMode, relationEditingFinished } from "@/app/events"
 import { editedEntityStore, editedRelationshipStore } from "@/app/stores"
 import { BaseEntity } from "@/libs/erd/base_entity"
 import { BaseRelationship, ParticipantType } from "@/libs/erd/base_relationship"
@@ -102,7 +102,7 @@ export default class EditModeManager {
         this.inEditMode = false
 
         if (!this.editedEntity && !this.editedRelationship) {
-            exitedEntityMode.Dispatch(null)
+            exitedEditMode.Dispatch(null)
             return
         }
 
@@ -118,6 +118,6 @@ export default class EditModeManager {
 
         editedRelationshipStore.Set({relationship: null})
         editedEntityStore.Set({entity: null})
-        exitedEntityMode.Dispatch(null)
+        exitedEditMode.Dispatch(null)
     }
 }

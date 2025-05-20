@@ -103,6 +103,7 @@ export namespace CrowsFootNotation {
             return this.modifier
         }
 
+        // FIXME: support several modifiers
         SetModifierType(this: EntityAttribute, modifier: ModifierType) {
             this.modifier = modifier
         }
@@ -125,7 +126,7 @@ export namespace CrowsFootNotation {
             })
         }
 
-        AttachToRelationship(this: EntityAttribute, relationship: Relationship, mousePos: Point) {
+        AttachToRelationship(this: EntityAttribute, relationship: Relationship, mousePos: Point, force: boolean = false) {
             if (this.modifier === ModifierType.None) {
                 console.info("Can only attach to PK or FK")
                 return
@@ -139,8 +140,12 @@ export namespace CrowsFootNotation {
 
             let connectorIdx = this.relationConnectors.findIndex(connector => connector.ContainsPoint(mousePos))
             if (connectorIdx === -1) {
-                console.warn("No connector found for relationship")
-                return
+                if (force) {
+                    connectorIdx = 0
+                } else {
+                    console.warn("No connector found for relationship")
+                    return
+                }
             }
 
             // TODO: check if attributes have already been connected
@@ -148,13 +153,13 @@ export namespace CrowsFootNotation {
 
             if (spareParticipants[0] === ParticipantType.First) {
                 relationship.SetFirstParticipant(new RelationshipParticipant(
-                    RelationType.SingleOptional,
+                    RelationType.SingleRequired,
                     this.relationConnectors[connectorIdx].GetPivotPoint(),
                     this,
                 ))
             } else {
                 relationship.SetSecondParticipant(new RelationshipParticipant(
-                    RelationType.SingleOptional,
+                    RelationType.SingleRequired,
                     this.relationConnectors[connectorIdx].GetPivotPoint(),
                     this,
                 ))
@@ -316,11 +321,11 @@ export namespace CrowsFootNotation {
             this.header.SetText(name)
         }
 
-        AddAttribute(this: Entity, attributeName: string, ...extraArgs: [string]) {
-            const [attributeType] = extraArgs
-
-            // TODO: don't hardcode height
-            this.attributes.push(new EntityAttribute(
+        AddAttribute(this: Entity, attributeName: string, ...extraArgs: any[]) {
+            console.log("got extraArgs", extraArgs)
+            const [attributeType, ...modifiers] = extraArgs as [number, ...ModifierType[]]
+            console.log("spread attrs", attributeType, modifiers)
+            const attr = new EntityAttribute(
                 "attribute" + this.attributes.length.toString(),
                 new Rectangle(
                     this.attributesContainer.shape.topLeftCorner.x,
@@ -329,7 +334,15 @@ export namespace CrowsFootNotation {
                     this.attributeHeight,
                 ),
                 attributeName,
-            ))
+            )
+
+             modifiers.forEach((modifier) => {
+                console.log("got modifier", modifier, "for", attr.GetText())
+                attr.SetModifierType(modifier)
+             })
+
+            // TODO: don't hardcode height
+            this.attributes.push(attr)
         }
 
         GetAttributes(this: Entity): EntityAttribute[] {

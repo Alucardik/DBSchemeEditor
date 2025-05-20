@@ -1,5 +1,6 @@
-import { Attribute, AttributeConstraint, AttributeType } from "@/app/models/attributes"
-import { Entity, Relationship, RelationshipDestination, Scheme } from "@/app/models/scheme"
+import { exitedEditMode } from "@/app/events"
+import { AttributeConstraint, AttributeType } from "@/app/models/attributes"
+import * as dto from "@/libs/dto/scheme"
 import { BaseEntity } from "@/libs/erd/base_entity"
 import { BaseRelationship } from "@/libs/erd/base_relationship"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
@@ -56,33 +57,32 @@ export default class ERDManager {
         })
     }
 
-    ConvertToServerScheme(this: ERDManager): Scheme {
-        const ret = new Scheme()
+    ConvertToServerScheme(this: ERDManager): dto.Scheme {
+        const ret = {} as dto.Scheme
         ret.relationships = this.relationships.map((relationShip) => {
-            const rel = new Relationship()
-
-            rel.from = new RelationshipDestination()
+            const rel = {} as dto.Relationship
             const fromAttr = relationShip.GetFirstParticipant()?.GetEntityAttribute()
             const toAttr = relationShip.GetSecondParticipant()?.GetEntityAttribute()
 
-            rel.from.attributeName = fromAttr?.GetText() || ""
-            rel.from.entityName = this.entities.find((entity) => {
+            // FIXME: support multi-part foreign and primary keys
+            rel.from.attributeNames = fromAttr ? [fromAttr.GetText()] : []
+            rel.from.tableName = this.entities.find((entity) => {
                 return entity.GetAttributes().findIndex((attribute) => attribute === fromAttr) !== -1
             })?.GetName() || ""
 
-            rel.to.attributeName = toAttr?.GetText() || ""
-            rel.to.entityName = this.entities.find((entity) => {
+            rel.to.attributeNames = toAttr ? [toAttr.GetText()] : []
+            rel.to.tableName = this.entities.find((entity) => {
                 return entity.GetAttributes().findIndex((attribute) => attribute === toAttr) !== -1
             })?.GetName() || ""
 
             return rel
         })
 
-        ret.entities = this.entities.map((entity) => {
-            const ent = new Entity()
-            ent.name = entity.GetName()
-            ent.attributes = entity.GetAttributes().map((attribute) => {
-                const attr = new Attribute()
+        ret.tables = this.entities.map((entity) => {
+            const table = {} as dto.Table
+            table.name = entity.GetName()
+            table.attributes = entity.GetAttributes().map((attribute) => {
+                const attr = {} as dto.Attribute
 
                 attr.name = attribute.GetText()
                 // FIXME: start using attribute types
@@ -104,10 +104,74 @@ export default class ERDManager {
                 return attr
             })
 
-            return ent
+            // FIXME: pass deps from entity, from PK at least
+            table.dependencies = [{"determinants":["CourseID","Year"],"dependants":["Lecturer","Exam"]},{"determinants":["CourseID"],"dependants":["Exam"]},{"determinants":["CourseID","Year"],"dependants":["Lecturer"]}]
+
+            return table
         })
 
         return ret
+    }
+
+    ImportFromServerScheme(this: ERDManager, scheme: dto.Scheme) {
+        this.entities = scheme.tables.map(((table, index) => {
+            const [xOffset, yOffset] = [150, 50]
+            switch (this.notationName) {
+                case CrowsFootNotation.GetNotationName():
+                default:
+                    const entity = new CrowsFootNotation.Entity(table.name, index * xOffset, yOffset)
+                    table.attributes.forEach(attr => {
+                        console.log("constraints", attr.constraints, "for", attr.name)
+                        entity.AddAttribute(attr.name, attr.type, ...attr.constraints.map(constraint => {
+                            switch (constraint) {
+                                case AttributeConstraint.ForeignKey:
+                                    return CrowsFootNotation.ModifierType.ForeignKey
+                                case AttributeConstraint.PrimaryKey:
+                                    return CrowsFootNotation.ModifierType.PrimaryKey
+                                default:
+                                    return 0
+                            }
+                        }))
+                    })
+                    entity.SetName(table.name)
+
+                    return entity
+            }
+        }))
+
+        this.relationships = scheme.relationships.map(relation => {
+            switch (this.notationName) {
+                case CrowsFootNotation.GetNotationName():
+                default:
+                    const rel = new CrowsFootNotation.Relationship()
+                    const fromEntity = this.entities.find(entity => entity.GetName() === relation.from.tableName)
+                    const toEntity = this.entities.find(entity => entity.GetName() === relation.to.tableName)
+
+                    if (!fromEntity || !toEntity) {
+                        console.error("failed to find relation from | to entity", fromEntity, toEntity)
+                        return rel
+                    }
+
+                    const fromAttrs = fromEntity.GetAttributes().filter(attr =>
+                        relation.from.attributeNames.findIndex((relationAttr) => relationAttr === attr.GetText()) !== -1) as CrowsFootNotation.EntityAttribute[]
+                    const toAttrs = toEntity.GetAttributes().filter(attr =>
+                        relation.to.attributeNames.findIndex((relationAttr) => relationAttr === attr.GetText()) !== -1)  as CrowsFootNotation.EntityAttribute[]
+
+                    if (fromAttrs.length === 0 || toAttrs.length === 0) {
+                        console.error("failed to find relation attributes", relation.from.attributeNames, relation.to.attributeNames)
+                        return rel
+                    }
+
+                    // FIXME: support attaching several attributes to a relationship
+                    fromAttrs[0].AttachToRelationship(rel, new Point(0, 0), true)
+                    toAttrs[0].AttachToRelationship(rel, new Point(0, 0), true)
+
+                    return rel
+            }
+        }).filter(relation => relation.IsComplete())
+
+        // render new scheme
+        exitedEditMode.Dispatch(null)
     }
 
     ImportScheme(this: ERDManager, scheme: string) {

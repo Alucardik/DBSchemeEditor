@@ -25,7 +25,7 @@ const enteredEditMode = new CustomEventWrapper<{
     selectPart: boolean,
 }>("enter_edit_mode")
 
-const exitedEntityMode = new CustomEventWrapper<null>("exit_edit_mode")
+const exitedEditMode = new CustomEventWrapper<null>("exit_edit_mode")
 
 const relationEditingStarted = new CustomEventWrapper<{
     relationship: BaseRelationship<any>,
@@ -42,7 +42,7 @@ export {
     editedEntityChanged,
     editedRelationshipChanged,
     enteredEditMode,
-    exitedEntityMode,
+    exitedEditMode,
     relationEditingStarted,
     relationEditingFinished,
 }
