@@ -3,9 +3,9 @@ import useStore from "@/app/hooks/use_store"
 import { canvasOffsetStore, editedEntityStore, editedRelationshipStore, notationStore } from "@/app/stores"
 import { RelationshipParticipant } from "@/libs/erd/base_relationship"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
+import Select from "react-select"
 
 import styles from './WidgetsMenu.module.scss'
-import ModifierType = CrowsFootNotation.ModifierType
 
 export default function WidgetsMenu() {
     const { notation } = useStore(notationStore)
@@ -84,7 +84,7 @@ export default function WidgetsMenu() {
         const crowsFootEntity = entity as CrowsFootNotation.Entity
         const selectedAttr = crowsFootEntity.GetSelectedAttribute()
         const modifierListVisible = selectedAttr ? "block" : "none"
-        const currentModifier = selectedAttr?.GetModifierType() || CrowsFootNotation.ModifierType.None
+        const currentModifiers = selectedAttr?.GetModifiers() || []
         const modifierOptions = []
 
         for (const modifier of CrowsFootNotation.GetAvailableModifierTypes()) {
@@ -112,18 +112,23 @@ export default function WidgetsMenu() {
                 </button>
                 <label style={{display: modifierListVisible, userSelect: "none"}}>
                     Modifiers
-                    <select
-                        className={styles["widgets-menu__list"]}
-                        defaultValue={currentModifier}
+                    <Select
+                        options={CrowsFootNotation.GetAvailableModifierTypes().map(modifier => {
+                            return { value: modifier, label: modifier }
+                        })}
+                        isSearchable={false}
+                        isMulti={true}
+                        placeholder={"Select modifiers"}
+                        isClearable={true}
+                        // className={styles["widgets-menu__list"]}
+                        defaultValue={currentModifiers}
                         onChange={(event) => {
-                            selectedAttr?.SetModifierType(event.target.value as ModifierType)
+                            selectedAttr?.SetModifiers(Array.from(event.values().map(({ value }) => value)))
                             editedEntityChanged.Dispatch({
                                 opType: EntityOpType.CHANGED,
                                 entityID: entity.GetID(),
                             })
-                    }}>
-                        {modifierOptions}
-                    </select>
+                    }} />
                 </label>
             </div>
         )

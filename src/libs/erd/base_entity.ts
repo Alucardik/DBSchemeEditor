@@ -21,7 +21,7 @@ export class EntityPart<S extends Shape> {
         this.GetTextPosition = (): [Point, boolean] => textPositionGetter(this.shape)
     }
 
-    static FromJSON<S extends Shape>(obj: EntityPart<S>, s: S): EntityPart<S> {
+    static FromJSON<S extends Shape>(obj: object, s: S): EntityPart<S> {
         const entityPart = Object.assign(new EntityPart("", s), obj)
         entityPart.shape = s
 

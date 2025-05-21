@@ -90,15 +90,19 @@ export default class ERDManager {
                 attr.constraints = []
 
                 if (attribute instanceof CrowsFootNotation.EntityAttribute) {
-                    const modifierType = (attribute as CrowsFootNotation.EntityAttribute).GetModifierType()
-                    switch (modifierType) {
-                        case CrowsFootNotation.ModifierType.PrimaryKey:
-                            attr.constraints.push(AttributeConstraint.PrimaryKey)
-                            break
-                        case CrowsFootNotation.ModifierType.ForeignKey:
-                            attr.constraints.push(AttributeConstraint.ForeignKey)
-                            break
-                    }
+                    (attribute as CrowsFootNotation.EntityAttribute).GetModifiers().forEach(modifier => {
+                        switch (modifier) {
+                            case CrowsFootNotation.ModifierType.NotNull:
+                                attr.constraints.push(AttributeConstraint.NotNullable)
+                                break
+                            case CrowsFootNotation.ModifierType.PrimaryKey:
+                                attr.constraints.push(AttributeConstraint.PrimaryKey)
+                                break
+                            case CrowsFootNotation.ModifierType.ForeignKey:
+                                attr.constraints.push(AttributeConstraint.ForeignKey)
+                                break
+                        }
+                    })
                 }
 
                 return attr
@@ -185,8 +189,10 @@ export default class ERDManager {
 
         switch (structuredScheme.notation) {
             case CrowsFootNotation.GetNotationName():
-                this.entities = structuredScheme.entities.map((entity: object) => CrowsFootNotation.Entity.FromJSON(entity)) as CrowsFootNotation.Entity[]
-                this.relationships = structuredScheme.relationships.map((relation: object) => CrowsFootNotation.Relationship.FromJSON(relation)) as CrowsFootNotation.Relationship[]
+                this.entities = structuredScheme.entities.map((entity: object) =>
+                    CrowsFootNotation.Entity.FromJSON(entity as CrowsFootNotation.Entity)) as CrowsFootNotation.Entity[]
+                this.relationships = structuredScheme.relationships.map((relation: object) =>
+                    CrowsFootNotation.Relationship.FromJSON(relation as CrowsFootNotation.Relationship)) as CrowsFootNotation.Relationship[]
                 break
             default:
                 throw Error(`Unknown scheme "${structuredScheme.notation}"`)

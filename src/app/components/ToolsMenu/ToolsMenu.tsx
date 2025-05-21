@@ -62,7 +62,6 @@ export default function ToolsMenu() {
             console.log(scheme)
             erdManager.ImportFromServerScheme(scheme)
 
-
             return
         }
 

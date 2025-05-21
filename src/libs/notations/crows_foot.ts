@@ -3,7 +3,7 @@ import { editedRelationshipStore } from "@/app/stores"
 import { BaseEntity, BaseEntityAttribute, EntityPart } from "@/libs/erd/base_entity"
 import { BaseRelationship, ParticipantType, RelationshipParticipant } from "@/libs/erd/base_relationship"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
-import { Ellipse, Point, Rectangle, ShapeRenderMode } from "@/libs/render/shapes"
+import { Ellipse, Point, Rectangle, Shape, ShapeRenderMode } from "@/libs/render/shapes"
 import type { Optional } from "@/libs/utils/types"
 
 export namespace CrowsFootNotation {
@@ -12,16 +12,16 @@ export namespace CrowsFootNotation {
     }
 
     export enum ModifierType {
+        NotNull = "NotNull",
         PrimaryKey = "PK",
         ForeignKey = "FK",
-        None = "None",
     }
 
     export function GetAvailableModifierTypes(): ModifierType[] {
         return [
+            ModifierType.NotNull,
             ModifierType.PrimaryKey,
             ModifierType.ForeignKey,
-            ModifierType.None,
         ]
     }
 
@@ -61,7 +61,8 @@ export namespace CrowsFootNotation {
         private readonly relationConnectorRadius: number = 3
         private readonly modifierOffset = 15
         private relationConnectors: [EntityRelationConnector, EntityRelationConnector]
-        private modifier: ModifierType = ModifierType.None
+        // TODO: switch to set, but serialize as Array
+        private modifiers: ModifierType[] = []
         // FIXME: multiple relationships work incorrectly
         // FIXME: convert to object when marshalling (Object.fromEntries(map.entries())
         private associatedRelationships: Map<number, [Relationship, number]> = new Map()
@@ -74,9 +75,10 @@ export namespace CrowsFootNotation {
             ]
         }
 
-        static override FromJSON(obj: EntityAttribute): EntityAttribute {
-            const rectangle = Object.assign(new Rectangle(), obj.shape)
-            rectangle.topLeftCorner = new Point(obj.shape.topLeftCorner.x, obj.shape.topLeftCorner.y)
+        static override FromJSON(obj: object, _ : Shape): EntityAttribute {
+            const castObj = obj as EntityAttribute
+            const rectangle = Object.assign(new Rectangle(), castObj.shape)
+            rectangle.topLeftCorner = new Point(castObj.shape.topLeftCorner.x, castObj.shape.topLeftCorner.y)
 
             const entityAttribute = Object.assign(new EntityAttribute("", rectangle), obj)
             // @ts-ignore
@@ -85,7 +87,7 @@ export namespace CrowsFootNotation {
             entityAttribute.relationConnectors = entityAttribute.relationConnectors.map((obj) => EntityRelationConnector.FromJSON(obj))
             entityAttribute.associatedRelationships = new Map()
 
-            for (const [key, [rawRelation, number]] of Object.entries(obj.associatedRelationships)) {
+            for (const [key, [rawRelation, number]] of Object.entries(castObj.associatedRelationships)) {
                 entityAttribute.associatedRelationships.set(key, [Relationship.FromJSON(rawRelation), number])
             }
 
@@ -99,13 +101,17 @@ export namespace CrowsFootNotation {
             return obj
         }
 
-        GetModifierType(this: EntityAttribute): ModifierType {
-            return this.modifier
+        GetModifiers(this: EntityAttribute): ReadonlyArray<ModifierType> {
+            return this.modifiers
         }
 
-        // FIXME: support several modifiers
-        SetModifierType(this: EntityAttribute, modifier: ModifierType) {
-            this.modifier = modifier
+        SetModifiers(this: EntityAttribute, modifiers: ModifierType[]) {
+            this.modifiers = modifiers
+        }
+
+        // FIXME: do no allocate set each time
+        AddModifierType(this: EntityAttribute, modifier: ModifierType) {
+            this.modifiers = Array.from(new Set([modifier, ...this.modifiers]).values())
         }
 
         SetPosition(this: EntityAttribute, x: number, y: number) {
@@ -126,8 +132,9 @@ export namespace CrowsFootNotation {
             })
         }
 
+        // TODO: allow to select connector index explicitly
         AttachToRelationship(this: EntityAttribute, relationship: Relationship, mousePos: Point, force: boolean = false) {
-            if (this.modifier === ModifierType.None) {
+            if (!this.IsKeyAttribute()) {
                 console.info("Can only attach to PK or FK")
                 return
             }
@@ -201,7 +208,7 @@ export namespace CrowsFootNotation {
         }
 
         CheckInteraction(this: EntityAttribute, p : Point): boolean {
-            if (this.modifier !== ModifierType.None) {
+            if (this.IsKeyAttribute()) {
                 for (const [idx, connector] of this.relationConnectors.entries()) {
                     if (!connector.ContainsPoint(p)) {
                         continue
@@ -227,25 +234,29 @@ export namespace CrowsFootNotation {
 
         Render(this: EntityAttribute, ctx: CanvasRenderingContext2D) {
             const [attrTextPos] = this.GetTextPosition()
-            const supportsRelationships = this.modifier !== ModifierType.None
 
             ctx.fillStyle = "black"
             ctx.textAlign = "left"
 
             ctx.fillText(this.GetText(), attrTextPos.x, attrTextPos.y, this.shape.width)
 
-            if (supportsRelationships) {
-                const modifierTextInfo = ctx.measureText(this.modifier)
-                ctx.fillText(this.modifier, attrTextPos.x + this.shape.width - modifierTextInfo.width - this.modifierOffset, attrTextPos.y)
-            }
-
-            if (supportsRelationships) {
+            // we render relation connectors only for the key attributes
+            if (this.IsKeyAttribute()) {
                 for (const connector of this.relationConnectors) {
                     connector.Render(ctx)
                 }
             }
 
+            this.modifiers.forEach(((modifier, index) => {
+                const modifierTextInfo = ctx.measureText(modifier)
+                ctx.fillText(modifier, attrTextPos.x + this.shape.width - modifierTextInfo.width - this.modifierOffset * (index + 1), attrTextPos.y)
+            }))
+
             resetCanvasContextProps(ctx, "fillStyle", "textAlign")
+        }
+
+        private IsKeyAttribute(this: EntityAttribute): boolean {
+            return this.modifiers.some(modifier => modifier === ModifierType.ForeignKey || modifier === ModifierType.PrimaryKey)
         }
     }
 
@@ -253,7 +264,7 @@ export namespace CrowsFootNotation {
         private readonly minWidth = 125
         private readonly minAttributesHeight = 65
         private readonly attributeHeight  = 20
-        private readonly firstAttributeOffset = 5
+        private readonly attributeOffset = 5
         private readonly headerHeight = 30
 
         private readonly header:  EntityPart<Rectangle>
@@ -322,24 +333,26 @@ export namespace CrowsFootNotation {
         }
 
         AddAttribute(this: Entity, attributeName: string, ...extraArgs: any[]) {
-            console.log("got extraArgs", extraArgs)
             const [attributeType, ...modifiers] = extraArgs as [number, ...ModifierType[]]
-            console.log("spread attrs", attributeType, modifiers)
             const attr = new EntityAttribute(
                 "attribute" + this.attributes.length.toString(),
                 new Rectangle(
                     this.attributesContainer.shape.topLeftCorner.x,
-                    this.attributesContainer.shape.topLeftCorner.y + this.firstAttributeOffset + this.attributes.length * this.attributeHeight,
+                    this.attributesContainer.shape.topLeftCorner.y + this.attributeOffset + this.attributes.length * this.attributeHeight,
                     this.attributesContainer.shape.width,
                     this.attributeHeight,
                 ),
                 attributeName,
             )
 
-             modifiers.forEach((modifier) => {
-                console.log("got modifier", modifier, "for", attr.GetText())
-                attr.SetModifierType(modifier)
-             })
+            // extend attributes container if new attribute overflows previous container
+            if (attr.shape.topLeftCorner.y + attr.shape.height > this.attributesContainer.shape.topLeftCorner.y + this.attributesContainer.shape.height) {
+                this.attributesContainer.shape.height += this.attributeHeight
+            }
+
+            modifiers.forEach((modifier) => {
+                attr.AddModifierType(modifier)
+            })
 
             // TODO: don't hardcode height
             this.attributes.push(attr)
@@ -359,7 +372,7 @@ export namespace CrowsFootNotation {
             this.attributes.forEach((attribute, i) => {
                 attribute.SetPosition(
                     this.attributesContainer.shape.topLeftCorner.x,
-                    this.attributesContainer.shape.topLeftCorner.y + this.firstAttributeOffset + i * this.attributeHeight,
+                    this.attributesContainer.shape.topLeftCorner.y + this.attributeOffset + i * this.attributeHeight,
                 )
             })
         }
