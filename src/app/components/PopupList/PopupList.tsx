@@ -2,6 +2,7 @@ import { Key } from "@/libs/utils/keys_enums"
 import { KeyboardEvent, MouseEvent } from "react"
 import styles from "./PopupList.module.scss"
 
+// TODO: create single popup component to import
 export default function PopupList({ isHidden, listHeading, listOptions, onButtonClickHandler, onCloseHandler }: {
     isHidden: boolean,
     listHeading: string,

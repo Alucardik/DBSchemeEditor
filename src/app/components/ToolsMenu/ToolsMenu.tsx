@@ -1,7 +1,10 @@
+"use client"
+
 import PopupText from "@/app/components/PopupText/PopupText"
 import { Scheme } from "@/libs/dto/scheme"
 import ERDManager from "@/libs/erd/erd_manager"
 import { HTTPMethod } from "@/libs/http/requests"
+import { redirect } from "next/navigation"
 import { useState } from "react"
 
 import styles from './ToolsMenu.module.scss'
@@ -12,6 +15,10 @@ export default function ToolsMenu() {
     const [isDeployPopupHidden, setDeployPopupHidden] = useState(true)
     const [sqlQuery, setSQLQuery] = useState("")
     const [deployStatus, setDeployStatus] = useState("")
+
+    const handleToMenuOnClick = () => {
+        redirect("/")
+    }
 
     const handleSaveOnClick = () => {
         localStorage.setItem(erdManager.GetSchemeExportID(), erdManager.ExportScheme())
@@ -75,6 +82,12 @@ export default function ToolsMenu() {
             <PopupText isHidden={isPopupHidden} listHeading={"Generated SQL-Script"} text={sqlQuery} onCloseHandler={() => setPopupHidden(true)} />
             <PopupText isHidden={isDeployPopupHidden} listHeading={deployStatus} text={""} onCloseHandler={() => setDeployPopupHidden(true)} />
             <div className={styles["tools-menu"]}>
+                <button
+                    className={styles["tools-menu__button"]}
+                    onClick={handleToMenuOnClick}
+                >
+                    To Menu
+                </button>
                 <button
                     className={styles["tools-menu__button"]}
                     onClick={handleSaveOnClick}

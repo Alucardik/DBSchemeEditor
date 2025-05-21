@@ -1,3 +1,5 @@
+"use client"
+
 import { Key } from "@/libs/utils/keys_enums"
 import { KeyboardEvent, MouseEvent } from "react"
 import styles from "./PopupText.module.scss"

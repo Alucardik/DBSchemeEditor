@@ -7,6 +7,7 @@ import { CrowsFootNotation } from "@/libs/notations/crows_foot"
 import { Point } from "@/libs/render/shapes"
 import { Optional } from "@/libs/utils/types"
 import { v4 as uuidv4, validate as validateUUID } from "uuid"
+import EntityAttributeType = CrowsFootNotation.AttributeType
 
 export default class ERDManager {
     private static instance: ERDManager
@@ -85,12 +86,27 @@ export default class ERDManager {
                 const attr = {} as dto.Attribute
 
                 attr.name = attribute.GetText()
-                // FIXME: start using attribute types
                 attr.type = AttributeType.Integer
                 attr.constraints = []
 
                 if (attribute instanceof CrowsFootNotation.EntityAttribute) {
-                    (attribute as CrowsFootNotation.EntityAttribute).GetModifiers().forEach(modifier => {
+                    const castAttr = attribute as CrowsFootNotation.EntityAttribute
+                    switch (castAttr.GetType()) {
+                        case EntityAttributeType.Integer:
+                            attr.type = AttributeType.Integer
+                            break
+                        case EntityAttributeType.Float:
+                            attr.type = AttributeType.Float
+                            break
+                        case EntityAttributeType.String:
+                            attr.type = AttributeType.String
+                            break
+                        case EntityAttributeType.Boolean:
+                            attr.type = AttributeType.Boolean
+                            break
+                    }
+
+                    castAttr.GetModifiers().forEach(modifier => {
                         switch (modifier) {
                             case CrowsFootNotation.ModifierType.NotNull:
                                 attr.constraints.push(AttributeConstraint.NotNullable)
@@ -107,9 +123,11 @@ export default class ERDManager {
 
                 return attr
             })
-
-            // FIXME: pass deps from entity, from PK at least
-            table.dependencies = [{"determinants":["CourseID","Year"],"dependants":["Lecturer","Exam"]},{"determinants":["CourseID"],"dependants":["Exam"]},{"determinants":["CourseID","Year"],"dependants":["Lecturer"]}]
+            
+            table.dependencies = entity.GetDependencies().map(dep => ({
+                determinants: dep.lhs,
+                dependants: dep.rhs,
+            }))
 
             return table
         })
@@ -119,21 +137,23 @@ export default class ERDManager {
 
     ImportFromServerScheme(this: ERDManager, scheme: dto.Scheme) {
         this.entities = scheme.tables.map(((table, index) => {
-            const [xOffset, yOffset] = [150, 50]
+            // TODO: add better position calculation, based on device screen
+            const [xOffset, yOffset] = [150, 500]
             switch (this.notationName) {
                 case CrowsFootNotation.GetNotationName():
                 default:
                     const entity = new CrowsFootNotation.Entity(table.name, index * xOffset, yOffset)
                     table.attributes.forEach(attr => {
-                        console.log("constraints", attr.constraints, "for", attr.name)
                         entity.AddAttribute(attr.name, attr.type, ...attr.constraints.map(constraint => {
                             switch (constraint) {
+                                case AttributeConstraint.NotNullable:
+                                    return CrowsFootNotation.ModifierType.NotNull
                                 case AttributeConstraint.ForeignKey:
                                     return CrowsFootNotation.ModifierType.ForeignKey
                                 case AttributeConstraint.PrimaryKey:
                                     return CrowsFootNotation.ModifierType.PrimaryKey
                                 default:
-                                    return 0
+                                    return ""
                             }
                         }))
                     })

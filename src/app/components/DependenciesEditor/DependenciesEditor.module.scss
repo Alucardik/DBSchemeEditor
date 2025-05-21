@@ -1,0 +1,36 @@
+.dependencies-editor {
+  align-items: center;
+  background-color: #fff;
+  border-radius: var(--button-border-radius);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: auto;
+  padding: 10px;
+  z-index: 6;
+
+  &__options {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 25px;
+  }
+
+  &__option {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+  }
+
+  &__overlay {
+    background-color: var(--color-backgroud-primary);
+    display: flex;
+    height: 100%;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 100%;
+    z-index: 10;
+  }
+}

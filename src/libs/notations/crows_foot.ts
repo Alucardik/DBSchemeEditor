@@ -1,6 +1,6 @@
 import { relationEditingStarted } from "@/app/events"
 import { editedRelationshipStore } from "@/app/stores"
-import { BaseEntity, BaseEntityAttribute, EntityPart } from "@/libs/erd/base_entity"
+import { BaseEntity, BaseEntityAttribute, Dependency, EntityPart } from "@/libs/erd/base_entity"
 import { BaseRelationship, ParticipantType, RelationshipParticipant } from "@/libs/erd/base_relationship"
 import { resetCanvasContextProps } from "@/libs/render/canvas"
 import { Ellipse, Point, Rectangle, Shape, ShapeRenderMode } from "@/libs/render/shapes"
@@ -15,6 +15,13 @@ export namespace CrowsFootNotation {
         NotNull = "NotNull",
         PrimaryKey = "PK",
         ForeignKey = "FK",
+    }
+
+    export enum AttributeType {
+        Integer = "integer",
+        String = "string",
+        Float = "float",
+        Boolean = "boolean",
     }
 
     export function GetAvailableModifierTypes(): ModifierType[] {
@@ -61,6 +68,7 @@ export namespace CrowsFootNotation {
         private readonly relationConnectorRadius: number = 3
         private readonly modifierOffset = 15
         private relationConnectors: [EntityRelationConnector, EntityRelationConnector]
+        private type: AttributeType = AttributeType.Integer
         // TODO: switch to set, but serialize as Array
         private modifiers: ModifierType[] = []
         // FIXME: multiple relationships work incorrectly
@@ -156,7 +164,7 @@ export namespace CrowsFootNotation {
             }
 
             // TODO: check if attributes have already been connected
-            //  and disallow more than one connection
+            //  and disallow more than one same connection
 
             if (spareParticipants[0] === ParticipantType.First) {
                 relationship.SetFirstParticipant(new RelationshipParticipant(
@@ -255,8 +263,12 @@ export namespace CrowsFootNotation {
             resetCanvasContextProps(ctx, "fillStyle", "textAlign")
         }
 
-        private IsKeyAttribute(this: EntityAttribute): boolean {
+        IsKeyAttribute(this: EntityAttribute): boolean {
             return this.modifiers.some(modifier => modifier === ModifierType.ForeignKey || modifier === ModifierType.PrimaryKey)
+        }
+
+        GetType(this: EntityAttribute): AttributeType {
+            return this.type
         }
     }
 
@@ -330,6 +342,21 @@ export namespace CrowsFootNotation {
         override SetName(this: Entity, name: string) {
             super.SetName(name)
             this.header.SetText(name)
+        }
+
+        override GetDependencies(this: Entity): ReadonlyArray<Dependency> {
+            const pkAttributes = this.attributes.filter(attr => attr.IsKeyAttribute())
+
+            if (pkAttributes.length > 0) {
+                const nonPKAttributes = this.attributes.filter(attr => !attr.IsKeyAttribute())
+
+                return [{
+                    lhs: pkAttributes.map(attr => attr.GetText()),
+                    rhs: nonPKAttributes.map(attr => attr.GetText()),
+                }, ...this.dependencies]
+            }
+
+            return this.dependencies
         }
 
         AddAttribute(this: Entity, attributeName: string, ...extraArgs: any[]) {

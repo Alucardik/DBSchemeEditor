@@ -4,6 +4,11 @@ import type { Optional } from "@/libs/utils/types"
 
 export type TextPositionGetter<S extends Shape> = (s: S) => [Point, boolean]
 
+export type Dependency = {
+    lhs: string[],
+    rhs: string[],
+}
+
 export class EntityPart<S extends Shape> {
     readonly name: string
     readonly shape: S
@@ -55,6 +60,7 @@ export abstract class BaseEntity {
 
     protected readonly id: number
     protected name: string
+    protected dependencies: Dependency[] = []
 
     protected constructor(name: string) {
         this.name = name
@@ -65,6 +71,14 @@ export abstract class BaseEntity {
 
     GetID() {
         return this.id
+    }
+
+    GetDependencies(): ReadonlyArray<Dependency> {
+        return this.dependencies
+    }
+
+    SetDependencies(dependencies: Dependency[]) {
+        this.dependencies = dependencies
     }
 
     GetName() {

@@ -1,8 +1,17 @@
+"use client"
+
 import { editedEntityChanged, editedRelationshipChanged, EntityOpType, RelationshipOpType } from "@/app/events"
 import useStore from "@/app/hooks/use_store"
-import { canvasOffsetStore, editedEntityStore, editedRelationshipStore, notationStore } from "@/app/stores"
+import {
+    canvasOffsetStore,
+    editedEntityStore,
+    editedRelationshipStore,
+    inDependencyEditorStore,
+    notationStore
+} from "@/app/stores"
 import { RelationshipParticipant } from "@/libs/erd/base_relationship"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
+import { useRef } from "react"
 import Select from "react-select"
 
 import styles from './WidgetsMenu.module.scss'
@@ -12,6 +21,7 @@ export default function WidgetsMenu() {
     const { entity } = useStore(editedEntityStore)
     const { relationship } = useStore(editedRelationshipStore)
     const canvasOffset = useStore(canvasOffsetStore)
+    const currentAttrModifiers = useRef<{value: any, label: string}[]>([])
 
     // we are only editing fully established relationship
     if (relationship && relationship.IsComplete() && notation === CrowsFootNotation.GetNotationName()) {
@@ -84,12 +94,17 @@ export default function WidgetsMenu() {
         const crowsFootEntity = entity as CrowsFootNotation.Entity
         const selectedAttr = crowsFootEntity.GetSelectedAttribute()
         const modifierListVisible = selectedAttr ? "block" : "none"
-        const currentModifiers = selectedAttr?.GetModifiers() || []
-        const modifierOptions = []
 
-        for (const modifier of CrowsFootNotation.GetAvailableModifierTypes()) {
-            modifierOptions.push((<option key={modifier} value={modifier} style={{userSelect: "none"}}>{modifier}</option>))
-        }
+        // setCurrentAttrModifiers((selectedAttr?.GetModifiers() || []).map(modifier => ({
+        //     value: modifier,
+        //     label: modifier,
+        // })))
+
+        // FIXME: select contents only rerender when re-selecting the attribute (but calling setState above breaks in infinite loop)
+       currentAttrModifiers.current =  (selectedAttr?.GetModifiers() || []).map(modifier => ({
+            value: modifier,
+            label: modifier,
+        }))
 
         return (
             <div className={styles["widgets-menu"]} style={{left: entityPos.x - canvasOffset.x, top: entityPos.y - canvasOffset.y}}>
@@ -100,6 +115,11 @@ export default function WidgetsMenu() {
                     })
                 }}>
                     Remove
+                </button>
+                <button className={styles["widgets-menu__button"]} onClick={() => {
+                    inDependencyEditorStore.Set(true)
+                }}>
+                    Edit Dependencies
                 </button>
                 <button className={styles["widgets-menu__button"]} onClick={() => {
                     crowsFootEntity.AddAttribute("New Attribute", "string")
@@ -116,14 +136,15 @@ export default function WidgetsMenu() {
                         options={CrowsFootNotation.GetAvailableModifierTypes().map(modifier => {
                             return { value: modifier, label: modifier }
                         })}
-                        isSearchable={false}
-                        isMulti={true}
+                        value={currentAttrModifiers.current}
+                        isMulti
+                        isClearable
                         placeholder={"Select modifiers"}
-                        isClearable={true}
                         // className={styles["widgets-menu__list"]}
-                        defaultValue={currentModifiers}
                         onChange={(event) => {
-                            selectedAttr?.SetModifiers(Array.from(event.values().map(({ value }) => value)))
+                            const newModifiers = Array.from(event.values())
+                            currentAttrModifiers.current = newModifiers
+                            selectedAttr?.SetModifiers(newModifiers.map(({ value }) => value))
                             editedEntityChanged.Dispatch({
                                 opType: EntityOpType.CHANGED,
                                 entityID: entity.GetID(),
