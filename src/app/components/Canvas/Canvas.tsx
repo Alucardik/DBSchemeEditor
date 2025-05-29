@@ -13,13 +13,13 @@ import {
 } from "@/app/events"
 import useMousePosition from "@/app/hooks/use_mouse_position"
 import { canvasOffsetStore, notationStore } from "@/app/stores"
-import { BaseEntityAttribute } from "@/libs/erd/base_entity"
+import { BaseEntityAttribute, EntityPart } from "@/libs/erd/base_entity"
 import { BaseRelationship, ParticipantType } from "@/libs/erd/base_relationship"
 import ERDManager from "@/libs/erd/erd_manager"
 import CanvasRenderingContext2DStub from "@/libs/html_stubs/canvas_rendering_context_2d"
 import { CrowsFootNotation } from "@/libs/notations/crows_foot"
 import { Cursor } from "@/libs/render/cursor"
-import { Point } from "@/libs/render/shapes"
+import { Point, Shape } from "@/libs/render/shapes"
 import { Key } from "@/libs/utils/keys_enums"
 import type { Optional } from "@/libs/utils/types"
 import { KeyboardEvent, MouseEvent as ReactMouseEvent, RefObject, useEffect, useRef, WheelEvent } from "react"
@@ -42,6 +42,7 @@ export default function Canvas() {
     let ctx: CanvasRenderingContext2D = new CanvasRenderingContext2DStub()
     let lastMouseDownTimestamp = 0
     let lastFrameID = 0
+    let lastSelectedPart: Optional<EntityPart<Shape>> = null
 
     const animate = (animationCallback: () => void)=> {
         lastFrameID = requestAnimationFrame(animationCallback)
@@ -186,6 +187,11 @@ export default function Canvas() {
         })
     }
 
+    const handleOnExitEditMode = () => {
+        cursor.Reset()
+        animateERD()
+    }
+
     const handleOnRelationEditingStarted = ({ detail: { relationship, participantType }}: CustomEvent<{
         relationship: BaseRelationship<any>,
         participantType: ParticipantType,
@@ -249,6 +255,12 @@ export default function Canvas() {
         if (!selectedPart) {
             return
         }
+
+        if (selectedPart !== lastSelectedPart) {
+            cursor.Reset()
+        }
+
+        lastSelectedPart = selectedPart
 
         if (cursor.IsUnset()) {
             cursor.SetEditedString(selectedPart.GetText())
@@ -402,7 +414,7 @@ export default function Canvas() {
         editedEntityChanged.AddListener(handleOnEditedEntityChanged)
         editedRelationshipChanged.AddListener(handleOnEditedRelationshipChanged)
         enteredEditMode.AddListener(handleOnEnterEditMode)
-        exitedEditMode.AddListener(animateERD)
+        exitedEditMode.AddListener(handleOnExitEditMode)
         relationEditingStarted.AddListener(handleOnRelationEditingStarted)
         relationEditingFinished.AddListener(handleOnRelationEditingFinished)
         notationStore.Set({notation: erdManager.GetNotationName()})
@@ -412,7 +424,7 @@ export default function Canvas() {
             editedEntityChanged.RemoveListener(handleOnEditedEntityChanged)
             editedRelationshipChanged.RemoveListener(handleOnEditedRelationshipChanged)
             enteredEditMode.RemoveListener(handleOnEnterEditMode)
-            exitedEditMode.RemoveListener(animateERD)
+            exitedEditMode.RemoveListener(handleOnExitEditMode)
             relationEditingStarted.RemoveListener(handleOnRelationEditingStarted)
             relationEditingFinished.RemoveListener(handleOnRelationEditingFinished)
             cancelAnimationFrame(lastFrameID)

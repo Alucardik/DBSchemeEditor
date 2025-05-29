@@ -72,6 +72,12 @@ export class Normalizer {
         return [ret, []]
     }
 
+    ThirdNormalForm(this: Normalizer) {
+        this.scheme.tables.forEach(entity => {
+            new DependencyMatrix(entity.dependencies).ToThirdNormalForm()
+        })
+    }
+
     private TurnTableToSecondNormalForm(this: Normalizer, table: Table,fdMatrix: DependencyMatrix): [Table[], Relationship[]] {
         const tableRelations = fdMatrix.ToSecondNormalForm()
 

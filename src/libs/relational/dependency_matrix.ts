@@ -210,8 +210,6 @@ export class DependencyMatrix {
             ret[i] = []
         }
 
-        console.log("initialized", ret)
-
         for (const [i, row] of this.canonizedRows.entries()) {
             for (const [j, innerRow] of this.canonizedRows.entries()) {
                 if (j === i) {
@@ -229,48 +227,14 @@ export class DependencyMatrix {
         return ret
     }
 
-    Canonize(this: DependencyMatrix): void {
-        this.canonizedRows = []
-
-        for (const dependency of this.rows) {
-            if (dependency.rhs.size <= 1) {
-                this.canonizedRows.push(dependency)
-                continue
-            }
-
-            // make rhs of size 1 each
-            for (const attr of dependency.rhs) {
-                this.canonizedRows.push({
-                    lhs: dependency.lhs,
-                    rhs: new Set([attr]),
-                })
-            }
-        }
-
-
-
-        // TODO: add additional canonization steps like ruling out extra attributes and FD
-    }
-
     ToSecondNormalForm(this: DependencyMatrix): [string[], number][][] {
-        console.log("Initial fdMatrix\n", this.ToStringInitialRows())
-
-        this.Canonize()
-
-        console.log("Canonized fdMatrix\n", this.ToString())
+        this.FindMinimalCover()
 
         let rowIndexToStart = 0
-        const startRowCounts = this.GetCanonizedDeterminantsCountPerRow()
-        const startColCounts = this.GetCanonizedDeterminantOrderPerAttribute()
 
         // we select first row in (max ccount, min rcount) manner, going through each rcount in ascending order (ccount is fixed)
-        const maxColCount = startColCounts.reduce((maxColCount, currCount) => Math.max(maxColCount, currCount), 0)
-        const colCountsMaxIndices = startColCounts.
-        map((_, index)  => index).
-        filter((index) => startColCounts[index] === maxColCount)
-
-        const rowCountsIndicesAscending = startRowCounts.map((_, index)  => index)
-        rowCountsIndicesAscending.sort((a, b) => startRowCounts[a] - startRowCounts[b])
+        const colCountsMaxIndices = this.GetMaxCCountColumnIndices()
+        const rowCountsIndicesAscending = this.GetRowIndicesAscendingByRCount()
 
         for (const colIndex of colCountsMaxIndices) {
             for (let i = 0; i < rowCountsIndicesAscending.length; i++) {
@@ -284,6 +248,7 @@ export class DependencyMatrix {
         console.log("Selected row", rowIndexToStart, "first", this.GetCanonizedRow(rowIndexToStart))
 
         let currRowIndex = rowIndexToStart
+
         while (true) {
             const rowsMerged = this.MergePseudoTransitiveCanonicalRows(currRowIndex, 0)
             if (rowsMerged <= 0) {
@@ -293,20 +258,17 @@ export class DependencyMatrix {
 
             console.log("Merged", rowsMerged, "by pseudo transitivity fdMatrix\n", this.ToString())
 
-            const rowCounts = this.GetCanonizedDeterminantsCountPerRow()
-            const colCounts = this.GetCanonizedDeterminantOrderPerAttribute()
-
-            const maxRowCount = startColCounts.reduce((maxColCount, currCount) => Math.max(maxColCount, currCount), 0)
-            const rowCountsMaxIndices = rowCounts.
-                map((_, index)  => index).
-                filter((index) => rowCounts[index] === maxRowCount)
-
-            const colCountsIndicesAscending = colCounts.map((_, index)  => index)
-            colCountsIndicesAscending.sort((a, b) => colCounts[a] - colCounts[b])
+            const rowCountsMaxIndices = this.GetMaxRCountRowsIndices()
+            const colCountsIndicesAscending = this.GetColumnIndicesAscendingByCCount()
 
             for (const rowIndex of rowCountsMaxIndices) {
                 for (let i = 0; i < colCountsIndicesAscending.length; i++) {
                     if (this.GetCanonizedMatrixValue(rowIndex, colCountsIndicesAscending[i]) === 1) {
+                        // check that the selected row has at least one pseudo transitive attribute
+                        if (!this.HasPreudoTransitiveRHS(rowIndex)) {
+                            continue
+                        }
+
                         currRowIndex = rowIndex
                         break
                     }
@@ -323,6 +285,40 @@ export class DependencyMatrix {
         console.log("Removed duplicated dependants fdMatrix\n", this.ToString())
 
         return ret
+    }
+
+    ToThirdNormalForm(this: DependencyMatrix) {
+        this.FindMinimalCover()
+        this.MergeIdenticalDeterminantRows()
+
+        let rowIndexToStart = 0
+
+        // we select first row in (max rcount, min ccount) manner, going through each ccount in ascending order (rcount is fixed)
+        const rowCountsMaxIndices = this.GetMaxRCountRowsIndices()
+        const colCountsIndicesAscending = this.GetColumnIndicesAscendingByCCount()
+
+        for (const rowIndex of rowCountsMaxIndices) {
+            for (let i = 0; i < colCountsIndicesAscending.length; i++) {
+                if (this.GetCanonizedMatrixValue(rowIndex, colCountsIndicesAscending[i]) === 1) {
+                    // check that the selected row has at least one pseudo transitive attribute
+                    if (!this.HasPreudoTransitiveRHS(rowIndex)) {
+                        continue
+                    }
+
+                    rowIndexToStart = rowIndex
+                    break
+                }
+            }
+        }
+
+        console.log("Selected row", rowIndexToStart, "first", this.GetCanonizedRow(rowIndexToStart))
+
+        const rowTraverseOrder = [rowIndexToStart, ...(this.canonizedRows.map((_, i) => i).filter(idx => idx !== rowIndexToStart))]
+        for (const i of rowTraverseOrder) {
+            console.log("Selected", i, "next", this.GetCanonizedRow(i))
+            this.FollowPseudoTransitivePath(i, i, new Set<number>())
+            console.log("Matrix after path following", this.ToString())
+        }
     }
 
     ToStringInitialRows(this: DependencyMatrix): string {
@@ -344,12 +340,133 @@ export class DependencyMatrix {
             .join('\n');
     }
 
+    private FindMinimalCover(this: DependencyMatrix): void {
+        console.log("Initial fdMatrix\n", this.ToStringInitialRows())
+
+        this.canonizedRows = []
+
+        // split rhs by attribute
+        for (const dependency of this.rows) {
+            if (dependency.rhs.size === 0) {
+                continue
+            }
+
+            if (dependency.rhs.size === 1) {
+                this.canonizedRows.push(dependency)
+                continue
+            }
+
+            // make rhs of size 1 each
+            for (const attr of dependency.rhs) {
+                this.canonizedRows.push({
+                    lhs: dependency.lhs,
+                    rhs: new Set([attr]),
+                })
+            }
+        }
+
+        console.log("fdMatrix split by rhs:\n", this.ToString())
+
+
+        // eliminate extraneous lhs attributes
+        //  (for each row, for each attr in lhs try to remove this attr and check if rhs still holds)
+        for (const [rowIndex, row] of this.canonizedRows.entries()) {
+            const removedAttrs = new Set<string>()
+            for (const attr of row.lhs) {
+                const testLHS = new Set(row.lhs.difference(removedAttrs))
+                testLHS.delete(attr)
+
+                // build a temp FD list without current fd, but with the smaller LHS
+                const testFDs = this.canonizedRows.filter((_, i) => i !== rowIndex)
+
+                // if rhs is still in closure of testLHS, 'attr' is extraneous
+                const testClosure = this.Closure(testLHS, testFDs)
+
+                if (row.rhs.values().every(attr => testClosure.has(attr))) {
+                    removedAttrs.add(attr)
+                }
+            }
+
+            if (removedAttrs.size > 0) {
+                row.lhs = row.lhs.difference(removedAttrs)
+            }
+        }
+
+        console.log("fdMatrix with filtered lhs\n", this.ToString())
+
+        // TODO: use methodology from here: https://www.researchgate.net/publication/258493834_Minimization_of_Functional_Dependencies
+        // remove redundant FDs
+        const removedIndices = new Set<number>()
+        for (const [i, fd] of this.canonizedRows.entries()) {
+            // we do no take current row into account as well as all previously deleted rows
+            const temp = this.canonizedRows.filter(((_, j) => j !== i && !removedIndices.has(j)))
+            // if A ∉ closure(X) under temp, then fd is required
+            // we also assume, that each rhs size is 1, since we have split it up earlier
+
+            if (this.Closure(fd.lhs, temp).has([...fd.rhs][0])) {
+                removedIndices.add(i)
+            }
+        }
+
+        console.log("try to remove indices", removedIndices)
+
+        this.canonizedRows = this.canonizedRows.filter((_, i) => !removedIndices.has(i))
+
+        console.log("Canonized fdMatrix\n", this.ToString())
+    }
+
+    private HasPreudoTransitiveRHS(this: DependencyMatrix, rowIndex: number): boolean {
+        if (rowIndex >= this.canonizedRows.length) {
+            return false
+        }
+
+        const rhs = this.canonizedRows[rowIndex].rhs
+
+        for (const attr of rhs) {
+            const hasPseudoTransitiveRHS = this.canonizedRows.some((fd, i) => {
+                // skip current row
+                if (i === rowIndex) {
+                    return false
+                }
+
+                return fd.lhs.has(attr)
+            })
+
+            if (hasPseudoTransitiveRHS) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private FollowPseudoTransitivePath(this: DependencyMatrix, startRow: number, currRow: number, prevRows: Set<number>) {
+        for (const attrName of this.canonizedRows[currRow].rhs) {
+            // we erase dependencies only if we are not currently in the startRow
+            if (startRow !== currRow) {
+                this.canonizedRows[startRow].rhs.delete(attrName)
+            }
+
+            for (const [i, row] of this.canonizedRows.entries()) {
+                // we do not follow links trough start row or already visited rows
+                if (i === startRow || prevRows.has(i)) {
+                    continue
+                }
+
+                if (row.lhs.has(attrName)) {
+                    prevRows.add(currRow)
+                    this.FollowPseudoTransitivePath(startRow, i, prevRows)
+                }
+            }
+        }
+    }
+
     /**
      * Computes  closure({attrs}) based on current FD rows.
      * Principle: while closure enlarges,
      *   for every FD(X→A), if X⊆closure, then add A. (as dependent attribute)
      */
-    private Closure(this: DependencyMatrix, attrs: string[], fds: FD[]): Set<string> {
+    private Closure(this: DependencyMatrix, attrs: Set<string>, fds: FD[]): Set<string> {
         // TODO: could use extensive memoization
         const closure = new Set<string>(attrs)
         let changed = true
@@ -358,7 +475,7 @@ export class DependencyMatrix {
             changed = false
             for (const { lhs, rhs } of fds) {
                 // if lhs ⊆ closure
-                if ([...lhs].every(a => closure.has(a))) {
+                if (lhs.values().every(a => closure.has(a))) {
                     // добавляем rhs
                     for (const a of rhs) {
                         if (!closure.has(a)) {
@@ -368,8 +485,50 @@ export class DependencyMatrix {
                     }
                 }
             }
+
+            if (!changed) {
+                break
+            }
         }
 
         return closure
+    }
+
+    private GetMaxRCountRowsIndices(this: DependencyMatrix) {
+        const maxRowIndices = [] as number[]
+        const rowCounts = this.GetCanonizedDeterminantsCountPerRow()
+        const maxRCount = rowCounts.reduce((maxRCount, currCount) => Math.max(maxRCount, currCount), 0)
+
+        rowCounts.forEach((rowCount, rowIndex) => {
+            if (rowCount === maxRCount) {
+                maxRowIndices.push(rowIndex)
+            }
+        })
+
+        return maxRowIndices
+    }
+
+    private GetRowIndicesAscendingByRCount(this: DependencyMatrix) {
+        const rowCounts = this.GetCanonizedDeterminantsCountPerRow()
+        return rowCounts.map((_, idx)  => idx).toSorted((a, b) => rowCounts[a] - rowCounts[b])
+    }
+
+    private GetMaxCCountColumnIndices(this: DependencyMatrix) {
+        const maxColumnIndices = [] as number[]
+        const colCounts = this.GetCanonizedDeterminantOrderPerAttribute()
+        const maxCCount = colCounts.reduce((maxCCount, currCount) => Math.max(maxCCount, currCount), 0)
+
+        colCounts.forEach((colCount, rowIndex) => {
+            if (colCount === maxCCount) {
+                maxColumnIndices.push(rowIndex)
+            }
+        })
+
+        return maxColumnIndices
+    }
+
+    private GetColumnIndicesAscendingByCCount(this: DependencyMatrix) {
+        const columnCounts = this.GetCanonizedDeterminantOrderPerAttribute()
+        return columnCounts.map((_, idx)  => idx).toSorted((a, b) => columnCounts[a] - columnCounts[b])
     }
 }

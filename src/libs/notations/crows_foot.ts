@@ -141,7 +141,7 @@ export namespace CrowsFootNotation {
         }
 
         // TODO: allow to select connector index explicitly
-        AttachToRelationship(this: EntityAttribute, relationship: Relationship, mousePos: Point, force: boolean = false) {
+        AttachToRelationship(this: EntityAttribute, relationship: Relationship, mousePos: Point, forceIndex: -1 | 0 | 1 = -1) {
             if (!this.IsKeyAttribute()) {
                 console.info("Can only attach to PK or FK")
                 return
@@ -153,14 +153,16 @@ export namespace CrowsFootNotation {
                 return
             }
 
-            let connectorIdx = this.relationConnectors.findIndex(connector => connector.ContainsPoint(mousePos))
+            let connectorIdx: number
+            if (forceIndex !== -1) {
+                connectorIdx = forceIndex
+            } else {
+                connectorIdx = this.relationConnectors.findIndex(connector => connector.ContainsPoint(mousePos))
+            }
+
             if (connectorIdx === -1) {
-                if (force) {
-                    connectorIdx = 0
-                } else {
-                    console.warn("No connector found for relationship")
-                    return
-                }
+                console.warn("No connector found for relationship")
+                return
             }
 
             // TODO: check if attributes have already been connected
@@ -379,6 +381,10 @@ export namespace CrowsFootNotation {
 
             modifiers.forEach((modifier) => {
                 attr.AddModifierType(modifier)
+                // resetting position of relation connectors when adding new key attribute
+                if (modifier === ModifierType.ForeignKey || modifier === ModifierType.PrimaryKey) {
+                    attr.SetPosition(...attr.shape.topLeftCorner.Expand())
+                }
             })
 
             // TODO: don't hardcode height

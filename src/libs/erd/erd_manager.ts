@@ -61,12 +61,17 @@ export default class ERDManager {
     ConvertToServerScheme(this: ERDManager): dto.Scheme {
         const ret = {} as dto.Scheme
         ret.relationships = this.relationships.map((relationShip) => {
-            const rel = {} as dto.Relationship
+            const rel = {
+                from: {},
+                to: {},
+            } as dto.Relationship
             const fromAttr = relationShip.GetFirstParticipant()?.GetEntityAttribute()
             const toAttr = relationShip.GetSecondParticipant()?.GetEntityAttribute()
 
+
             // FIXME: support multi-part foreign and primary keys
             rel.from.attributeNames = fromAttr ? [fromAttr.GetText()] : []
+            // FIXME: table name still is unspecified
             rel.from.tableName = this.entities.find((entity) => {
                 return entity.GetAttributes().findIndex((attribute) => attribute === fromAttr) !== -1
             })?.GetName() || ""
@@ -138,11 +143,11 @@ export default class ERDManager {
     ImportFromServerScheme(this: ERDManager, scheme: dto.Scheme) {
         this.entities = scheme.tables.map(((table, index) => {
             // TODO: add better position calculation, based on device screen
-            const [xOffset, yOffset] = [150, 500]
+            const [xOffset, yOffset] = [250, 500]
             switch (this.notationName) {
                 case CrowsFootNotation.GetNotationName():
                 default:
-                    const entity = new CrowsFootNotation.Entity(table.name, index * xOffset, yOffset)
+                    const entity = new CrowsFootNotation.Entity(table.name, (index + 1) * xOffset, yOffset)
                     table.attributes.forEach(attr => {
                         entity.AddAttribute(attr.name, attr.type, ...attr.constraints.map(constraint => {
                             switch (constraint) {
@@ -187,8 +192,8 @@ export default class ERDManager {
                     }
 
                     // FIXME: support attaching several attributes to a relationship
-                    fromAttrs[0].AttachToRelationship(rel, new Point(0, 0), true)
-                    toAttrs[0].AttachToRelationship(rel, new Point(0, 0), true)
+                    fromAttrs[0].AttachToRelationship(rel, new Point(0, 0), 1)
+                    toAttrs[0].AttachToRelationship(rel, new Point(0, 0), 0)
 
                     return rel
             }

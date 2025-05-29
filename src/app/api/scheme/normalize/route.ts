@@ -22,6 +22,17 @@ export async function POST(req: NextRequest) {
     const scheme = new Scheme(rawScheme)
     const normalizer = new Normalizer(scheme)
 
+    normalizer.ThirdNormalForm()
+
+    // REMOVE
+
+
+    return NextResponse.json({
+        scheme: "ok",
+    }, {
+        status: HTTPStatuses.OK
+    })
+
     const [newScheme, violations] = normalizer.SecondNormalForm()
     if (violations.length > 0 || !newScheme) {
         return NextResponse.json({

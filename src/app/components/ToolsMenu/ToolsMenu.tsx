@@ -58,10 +58,35 @@ export default function ToolsMenu() {
         setDeployPopupHidden(false)
     }
 
-    const handleOnNormalizeClick = async () => {
-        const resp = await fetch("/api/scheme/normalize", {
+    const handleOnNormalize2NFClick = async () => {
+        const resp = await fetch("http://localhost:3000/api/scheme/normalize?nf=2", {
             method: HTTPMethod.POST,
-            body: JSON.stringify(erdManager.ConvertToServerScheme())
+            body: JSON.stringify(erdManager.ConvertToServerScheme()),
+            headers: {
+              "Content-Type": "application/json",
+            },
+        })
+
+        if (resp.ok) {
+            const { scheme } = await resp.json() as { scheme: Scheme }
+            console.log(scheme)
+            erdManager.ImportFromServerScheme(scheme)
+
+            return
+        }
+
+        // TODO: support 422
+        const { violations } = await resp.json()
+        console.error(violations)
+    }
+
+    const handleOnNormalize3NFClick = async () => {
+        const resp = await fetch("http://localhost:3000/api/scheme/normalize?nf=3", {
+            method: HTTPMethod.POST,
+            body: JSON.stringify(erdManager.ConvertToServerScheme()),
+            headers: {
+                "Content-Type": "application/json",
+            },
         })
 
         if (resp.ok) {
@@ -108,9 +133,15 @@ export default function ToolsMenu() {
                 </button>
                 <button
                     className={styles["tools-menu__button"]}
-                    onClick={handleOnNormalizeClick}
+                    onClick={handleOnNormalize2NFClick}
                 >
-                    Normalize Scheme
+                    Normalize Scheme To 2NF
+                </button>
+                <button
+                    className={styles["tools-menu__button"]}
+                    onClick={handleOnNormalize3NFClick}
+                >
+                    Normalize Scheme To 3NF
                 </button>
             </div>
         </>

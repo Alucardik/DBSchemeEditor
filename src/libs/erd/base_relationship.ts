@@ -13,9 +13,9 @@ export class RelationshipParticipant<RT extends any> {
     private attribute: Optional<BaseEntityAttribute<Shape>>
     private relationType: RT
 
-    constructor(relationType: RT, position?: Point, entity?: BaseEntityAttribute<Shape>) {
+    constructor(relationType: RT, position?: Point, attribute?: BaseEntityAttribute<Shape>) {
         this.position = position ? position : new Point(-1, -1)
-        this.attribute = entity ? entity : null
+        this.attribute = attribute ? attribute : null
         this.relationType = relationType
     }
 
