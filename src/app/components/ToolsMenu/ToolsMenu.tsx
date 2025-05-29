@@ -3,7 +3,7 @@
 import PopupText from "@/app/components/PopupText/PopupText"
 import { Scheme } from "@/libs/dto/scheme"
 import ERDManager from "@/libs/erd/erd_manager"
-import { HTTPMethod } from "@/libs/http/requests"
+import { Client } from "@/libs/server/client"
 import { redirect } from "next/navigation"
 import { useState } from "react"
 
@@ -25,11 +25,7 @@ export default function ToolsMenu() {
     }
 
     const handleOnGenerateSQLClick = async () => {
-        const resp = await fetch("/api/scheme/generate/sql", {
-            method: HTTPMethod.POST,
-            body: JSON.stringify(erdManager.ConvertToServerScheme())
-        })
-
+        const resp = await Client.GenerateSQL(erdManager.ConvertToServerScheme())
         if (resp.ok) {
             const { sql } = await resp.json()
             setSQLQuery(sql)
@@ -42,11 +38,7 @@ export default function ToolsMenu() {
     }
 
     const handleOnDeployToDBClick = async () => {
-        const resp = await fetch("/api/scheme/apply", {
-            method: HTTPMethod.POST,
-            body: JSON.stringify(erdManager.ConvertToServerScheme())
-        })
-
+        const resp = await Client.ApplyScheme(erdManager.ConvertToServerScheme())
         if (resp.ok) {
             setDeployStatus("Scheme successfully deployed")
             setDeployPopupHidden(false)
@@ -59,14 +51,7 @@ export default function ToolsMenu() {
     }
 
     const handleOnNormalize2NFClick = async () => {
-        const resp = await fetch("http://localhost:3000/api/scheme/normalize?nf=2", {
-            method: HTTPMethod.POST,
-            body: JSON.stringify(erdManager.ConvertToServerScheme()),
-            headers: {
-              "Content-Type": "application/json",
-            },
-        })
-
+        const resp = await Client.NormalizeScheme(erdManager.ConvertToServerScheme(), 2)
         if (resp.ok) {
             const { scheme } = await resp.json() as { scheme: Scheme }
             console.log(scheme)
@@ -81,14 +66,7 @@ export default function ToolsMenu() {
     }
 
     const handleOnNormalize3NFClick = async () => {
-        const resp = await fetch("http://localhost:3000/api/scheme/normalize?nf=3", {
-            method: HTTPMethod.POST,
-            body: JSON.stringify(erdManager.ConvertToServerScheme()),
-            headers: {
-                "Content-Type": "application/json",
-            },
-        })
-
+        const resp = await Client.NormalizeScheme(erdManager.ConvertToServerScheme(), 3)
         if (resp.ok) {
             const { scheme } = await resp.json() as { scheme: Scheme }
             console.log(scheme)
