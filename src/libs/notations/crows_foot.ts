@@ -64,6 +64,7 @@ export namespace CrowsFootNotation {
         }
     }
 
+    // @ts-ignore
     export class EntityAttribute extends BaseEntityAttribute<Rectangle> {
         private readonly relationConnectorRadius: number = 3
         private readonly modifierOffset = 15
@@ -96,6 +97,7 @@ export namespace CrowsFootNotation {
             entityAttribute.associatedRelationships = new Map()
 
             for (const [key, [rawRelation, number]] of Object.entries(castObj.associatedRelationships)) {
+                // @ts-ignore
                 entityAttribute.associatedRelationships.set(key, [Relationship.FromJSON(rawRelation), number])
             }
 
@@ -104,6 +106,7 @@ export namespace CrowsFootNotation {
 
         ToJSON(this: EntityAttribute): object {
             const obj = Object.assign({}, this)
+            // @ts-ignore
             obj.associatedRelationships = Object.fromEntries(this.associatedRelationships.entries())
 
             return obj
@@ -321,8 +324,11 @@ export namespace CrowsFootNotation {
             const entity = Object.assign(new Entity(""), rawEntity)
 
             entity.header.GetTextPosition = () => headerPositionGetter(headerShape)
+            // @ts-ignore
             entity.header = EntityPart.FromJSON(entity.header, headerShape)
+            // @ts-ignore
             entity.attributes = rawEntity.attributes.map((obj) => EntityAttribute.FromJSON(obj))
+            // @ts-ignore
             entity.attributesContainer = EntityPart.FromJSON(entity.attributesContainer, attributesContainerShape)
             entity.selectedPart = null
 
@@ -331,6 +337,7 @@ export namespace CrowsFootNotation {
 
         ToJSON(this: Entity): object {
             const obj = Object.assign({}, this)
+            // @ts-ignore
             obj.attributes = this.attributes.map((attribute) => attribute.ToJSON())
 
             return obj
@@ -597,7 +604,9 @@ export namespace CrowsFootNotation {
             Object.assign(ret, obj)
 
             // FIXME: link to existing attributes instead of creating a new one (breaks relationships)
+            // @ts-ignore
             ret.firstParticipant = RelationshipParticipant.FromJSON(obj.firstParticipant, new Rectangle())
+            // @ts-ignore
             ret.secondParticipant = RelationshipParticipant.FromJSON(obj.secondParticipant, new Rectangle())
 
             return ret

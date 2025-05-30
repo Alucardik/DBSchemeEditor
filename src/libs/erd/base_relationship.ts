@@ -20,10 +20,13 @@ export class RelationshipParticipant<RT extends any> {
     }
 
     static FromJSON<RT extends any>(obj: RelationshipParticipant<RT>, attrShape: Shape): RelationshipParticipant<RT> {
+        // @ts-ignore
         const ret = new RelationshipParticipant<RT>(null)
         Object.assign(ret, obj)
 
+        // @ts-ignore
         ret.position = new Point(obj.position.x, obj.position.y)
+        // @ts-ignore
         ret.attribute = BaseEntityAttribute.FromJSON(obj.attribute, attrShape)
 
         return ret

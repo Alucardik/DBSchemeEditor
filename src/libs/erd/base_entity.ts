@@ -28,6 +28,7 @@ export class EntityPart<S extends Shape> {
 
     static FromJSON<S extends Shape>(obj: object, s: S): EntityPart<S> {
         const entityPart = Object.assign(new EntityPart("", s), obj)
+        // @ts-ignore
         entityPart.shape = s
 
         return entityPart

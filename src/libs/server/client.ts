@@ -8,7 +8,7 @@ export class Client {
     private readonly apiEndpoint: string = defaultAPIEndpoint
 
     private constructor() {
-        this.apiEndpoint = process.env.API_ENDPOINT || defaultAPIEndpoint
+        this.apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT || defaultAPIEndpoint
     }
 
     static async NormalizeScheme(scheme: Scheme, nf: 2 | 3) {
