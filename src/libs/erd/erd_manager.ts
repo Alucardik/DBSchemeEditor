@@ -68,15 +68,14 @@ export default class ERDManager {
             const fromAttr = relationShip.GetFirstParticipant()?.GetEntityAttribute()
             const toAttr = relationShip.GetSecondParticipant()?.GetEntityAttribute()
 
-
             // FIXME: support multi-part foreign and primary keys
-            rel.from.attributeNames = fromAttr ? [fromAttr.GetText()] : []
+            rel.from.attributeNames = fromAttr ? [fromAttr.GetText().split(":")[0].trim()] : []
             // FIXME: table name still is unspecified
             rel.from.tableName = this.entities.find((entity) => {
                 return entity.GetAttributes().findIndex((attribute) => attribute === fromAttr) !== -1
             })?.GetName() || ""
 
-            rel.to.attributeNames = toAttr ? [toAttr.GetText()] : []
+            rel.to.attributeNames = toAttr ? [toAttr.GetText().split(":")[0].trim()] : []
             rel.to.tableName = this.entities.find((entity) => {
                 return entity.GetAttributes().findIndex((attribute) => attribute === toAttr) !== -1
             })?.GetName() || ""
@@ -90,7 +89,7 @@ export default class ERDManager {
             table.attributes = entity.GetAttributes().map((attribute) => {
                 const attr = {} as dto.Attribute
 
-                attr.name = attribute.GetText()
+                attr.name = attribute.GetText().split(":")[0].trim()
                 attr.type = AttributeType.Integer
                 attr.constraints = []
 
@@ -149,7 +148,20 @@ export default class ERDManager {
                 default:
                     const entity = new CrowsFootNotation.Entity(table.name, (index + 1) * xOffset, yOffset)
                     table.attributes.forEach(attr => {
-                        entity.AddAttribute(attr.name, attr.type, ...attr.constraints.map(constraint => {
+                        let attrType = EntityAttributeType.Integer
+                        switch (attr.type) {
+                            case AttributeType.String:
+                                attrType = EntityAttributeType.String
+                                break
+                            case AttributeType.Boolean:
+                                attrType = EntityAttributeType.Boolean
+                                break
+                            case AttributeType.Float:
+                                attrType = EntityAttributeType.Float
+                                break
+                        }
+
+                        entity.AddAttribute(attr.name, attrType, ...attr.constraints.map(constraint => {
                             switch (constraint) {
                                 case AttributeConstraint.NotNullable:
                                     return CrowsFootNotation.ModifierType.NotNull
@@ -182,9 +194,9 @@ export default class ERDManager {
                     }
 
                     const fromAttrs = fromEntity.GetAttributes().filter(attr =>
-                        relation.from.attributeNames.findIndex((relationAttr) => relationAttr === attr.GetText()) !== -1) as CrowsFootNotation.EntityAttribute[]
+                        relation.from.attributeNames.findIndex((relationAttr) => relationAttr === attr.GetText().split(":")[0].trim()) !== -1) as CrowsFootNotation.EntityAttribute[]
                     const toAttrs = toEntity.GetAttributes().filter(attr =>
-                        relation.to.attributeNames.findIndex((relationAttr) => relationAttr === attr.GetText()) !== -1)  as CrowsFootNotation.EntityAttribute[]
+                        relation.to.attributeNames.findIndex((relationAttr) => relationAttr === attr.GetText().split(":")[0].trim()) !== -1)  as CrowsFootNotation.EntityAttribute[]
 
                     if (fromAttrs.length === 0 || toAttrs.length === 0) {
                         console.error("failed to find relation attributes", relation.from.attributeNames, relation.to.attributeNames)

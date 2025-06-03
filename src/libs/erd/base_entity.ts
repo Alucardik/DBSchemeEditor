@@ -42,7 +42,6 @@ export class EntityPart<S extends Shape> {
         this.text = text
     }
 
-
     // GetTextPosition returns text position relative to this EnityPart's shape;
     // the second parameter tells whether the text is centered or not (may be overriden in the constructor)
     GetTextPosition = (): [Point, boolean] => {

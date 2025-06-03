@@ -24,6 +24,8 @@ export namespace CrowsFootNotation {
         Boolean = "boolean",
     }
 
+    const availableAttributeTypes = new Set([AttributeType.Integer, AttributeType.String, AttributeType.Float, AttributeType.Boolean]) as ReadonlySet<AttributeType>
+
     export function GetAvailableModifierTypes(): ModifierType[] {
         return [
             ModifierType.NotNull,
@@ -68,7 +70,7 @@ export namespace CrowsFootNotation {
     export class EntityAttribute extends BaseEntityAttribute<Rectangle> {
         private readonly relationConnectorRadius: number = 3
         private readonly modifierOffset = 15
-        private relationConnectors: [EntityRelationConnector, EntityRelationConnector]
+        private readonly relationConnectors: [EntityRelationConnector, EntityRelationConnector]
         private type: AttributeType = AttributeType.Integer
         // TODO: switch to set, but serialize as Array
         private modifiers: ModifierType[] = []
@@ -242,7 +244,18 @@ export namespace CrowsFootNotation {
             }
 
             return this.shape.ContainsPoint(p)
+        }
 
+        // TODO: Use a separate method for setting type
+        override SetText(text: string) {
+            super.SetText(text)
+            const textParts = text.split(":")
+            if (textParts.length > 1) {
+                const potentialType = textParts[textParts.length - 1].trim() as AttributeType
+                if (availableAttributeTypes.has(potentialType)) {
+                    this.type = potentialType
+                }
+            }
         }
 
         Render(this: EntityAttribute, ctx: CanvasRenderingContext2D) {
@@ -360,16 +373,22 @@ export namespace CrowsFootNotation {
                 const nonPKAttributes = this.attributes.filter(attr => !attr.IsKeyAttribute())
 
                 return [{
-                    lhs: pkAttributes.map(attr => attr.GetText()),
-                    rhs: nonPKAttributes.map(attr => attr.GetText()),
-                }, ...this.dependencies]
+                    lhs: pkAttributes.map(attr => attr.GetText().split(":")[0].trim()),
+                    rhs: nonPKAttributes.map(attr => attr.GetText().split(":")[0].trim()),
+                }, ...this.dependencies.map((dep) => ({
+                    lhs: dep.lhs.map(dep => dep.split(":")[0].trim()),
+                    rhs: dep.rhs.map(dep => dep.split(":")[0].trim()),
+                } as Dependency))]
             }
 
-            return this.dependencies
+            return this.dependencies.map((dep) => ({
+                lhs: dep.lhs.map(dep => dep.split(":")[0].trim()),
+                rhs: dep.rhs.map(dep => dep.split(":")[0].trim()),
+            } as Dependency))
         }
 
         AddAttribute(this: Entity, attributeName: string, ...extraArgs: any[]) {
-            const [attributeType, ...modifiers] = extraArgs as [number, ...ModifierType[]]
+            const [attributeType, ...modifiers] = extraArgs as [AttributeType, ...ModifierType[]]
             const attr = new EntityAttribute(
                 "attribute" + this.attributes.length.toString(),
                 new Rectangle(
@@ -380,6 +399,8 @@ export namespace CrowsFootNotation {
                 ),
                 attributeName,
             )
+
+            attr.SetText(attributeName + ": " + attributeType)
 
             // extend attributes container if new attribute overflows previous container
             if (attr.shape.topLeftCorner.y + attr.shape.height > this.attributesContainer.shape.topLeftCorner.y + this.attributesContainer.shape.height) {

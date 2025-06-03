@@ -70,7 +70,7 @@ export default function DependenciesEditor() {
                         return (
                             <li className={styles["dependencies-editor__option"]} key={i}>
                                 <DependencyRow
-                                    options={entity.GetAttributes().map(attr => attr.GetText())}
+                                    options={entity.GetAttributes().map(attr => attr.GetText().split(":")[0].trim())}
                                     lhs={dependency.lhs}
                                     rhs={dependency.rhs}
                                     nonEditable={dependency.nonEditable}

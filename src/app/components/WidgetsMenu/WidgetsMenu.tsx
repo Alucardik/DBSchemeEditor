@@ -122,7 +122,7 @@ export default function WidgetsMenu() {
                     Edit Dependencies
                 </button>
                 <button className={styles["widgets-menu__button"]} onClick={() => {
-                    crowsFootEntity.AddAttribute("New Attribute", "string")
+                    crowsFootEntity.AddAttribute("New Attribute")
                     editedEntityChanged.Dispatch({
                         opType: EntityOpType.CHANGED,
                         entityID: entity.GetID(),
